@@ -35,6 +35,26 @@ program
   });
 
 program
+  .command('uninstall')
+  .alias('remove')
+  .description('Uninstall and remove MCP server configurations & skills from AI Agents')
+  .option('-a, --agent <agents...>', 'Specify agents directly (antigravity, opencode, claude, cursor, windsurf)')
+  .option('--local', 'Remove from current workspace instead of global user configs', false)
+  .action(async (options: { agent?: string[]; local?: boolean }) => {
+    if (options.agent && options.agent.length > 0) {
+      const installer = new AgentInstaller();
+      const agents = options.agent as SupportedAgent[];
+      const isGlobal = !options.local;
+      console.log(`🧹 Menghapus konfigurasi untuk ${agents.join(', ')} (Scope: ${isGlobal ? 'Global' : 'Local'})...`);
+      const result = await installer.uninstallForAgents(agents, isGlobal);
+      for (const s of result.uninstalled) console.log(`✅ ${s}`);
+      for (const e of result.errors) console.log(`⚠️ ${e}`);
+    } else {
+      await AgentInstaller.promptInteractiveUninstall();
+    }
+  });
+
+program
   .command('open <url>')
   .description('Open a URL and inspect its interactive elements')
   .option('--headed', 'Run browser in visible window mode', false)

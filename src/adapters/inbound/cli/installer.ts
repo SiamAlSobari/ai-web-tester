@@ -95,15 +95,15 @@ export class AgentInstaller {
             break;
           case 'claude':
             await this.configureClaude(isGlobal);
-            installed.push('Claude Code / Claude Desktop (MCP Config)');
+            installed.push(`Claude Code / Desktop (MCP Config & ${isGlobal ? 'Global' : 'Local'} Skills)`);
             break;
           case 'cursor':
             await this.configureCursor(isGlobal);
-            installed.push('Cursor (MCP Config)');
+            installed.push(`Cursor (MCP Config & ${isGlobal ? 'Global' : 'Local'} Rules)`);
             break;
           case 'windsurf':
             await this.configureWindsurf(isGlobal);
-            installed.push('Windsurf / Roo Code (MCP Config)');
+            installed.push(`Windsurf / Roo Code (MCP Config & ${isGlobal ? 'Global' : 'Local'} Skills)`);
             break;
         }
       } catch (err: unknown) {
@@ -112,6 +112,42 @@ export class AgentInstaller {
     }
 
     return { installed, errors };
+  }
+
+  async uninstallForAgents(agents: SupportedAgent[], isGlobal = true): Promise<{ uninstalled: string[]; errors: string[] }> {
+    const uninstalled: string[] = [];
+    const errors: string[] = [];
+
+    for (const agent of agents) {
+      try {
+        switch (agent) {
+          case 'antigravity':
+            await this.unconfigureAntigravity(isGlobal);
+            uninstalled.push(`Antigravity (Removed MCP & Skills)`);
+            break;
+          case 'opencode':
+            await this.unconfigureOpenCode(isGlobal);
+            uninstalled.push(`OpenCode (Removed MCP & Skills)`);
+            break;
+          case 'claude':
+            await this.unconfigureClaude(isGlobal);
+            uninstalled.push(`Claude Code / Desktop (Removed MCP & Skills)`);
+            break;
+          case 'cursor':
+            await this.unconfigureCursor(isGlobal);
+            uninstalled.push(`Cursor (Removed MCP & Rules)`);
+            break;
+          case 'windsurf':
+            await this.unconfigureWindsurf(isGlobal);
+            uninstalled.push(`Windsurf / Roo Code (Removed MCP & Skills)`);
+            break;
+        }
+      } catch (err: unknown) {
+        errors.push(`${agent}: ${err instanceof Error ? err.message : String(err)}`);
+      }
+    }
+
+    return { uninstalled, errors };
   }
 
   async configureAntigravity(isGlobal: boolean): Promise<void> {
@@ -140,6 +176,25 @@ export class AgentInstaller {
     await this.writeSkillTemplates(skillsTargetDir);
   }
 
+  async unconfigureAntigravity(isGlobal: boolean): Promise<void> {
+    const targetMcpFile = isGlobal
+      ? path.join(this.homeDir, '.gemini', 'config', 'mcp_config.json')
+      : path.join(this.projectRoot, 'mcp_config.json');
+
+    await this.mergeJsonConfig(targetMcpFile, (current) => {
+      if (current.mcpServers) {
+        delete current.mcpServers['ai-browser-testing'];
+      }
+      return current;
+    });
+
+    const skillsTargetDir = isGlobal
+      ? path.join(this.homeDir, '.gemini', 'config', 'skills')
+      : path.join(this.projectRoot, '.agents', 'skills');
+
+    await this.removeSkillTemplates(skillsTargetDir);
+  }
+
   async configureOpenCode(isGlobal: boolean): Promise<void> {
     const targetFiles: string[] = [];
     if (isGlobal) {
@@ -154,13 +209,11 @@ export class AgentInstaller {
     for (const targetFile of targetFiles) {
       await this.mergeJsonConfig(targetFile, (current) => {
         current.$schema = current.$schema || 'https://opencode.ai/config.json';
-        // OpenCode schema 1: mcp dictionary
         current.mcp = current.mcp || {};
         current.mcp['ai-browser-testing'] = {
           type: 'local',
           command: ['node', this.mcpExecutablePath],
         };
-        // OpenCode schema 2: mcpServers fallback
         current.mcpServers = current.mcpServers || {};
         current.mcpServers['ai-browser-testing'] = {
           command: 'node',
@@ -183,6 +236,40 @@ export class AgentInstaller {
 
     for (const dir of skillsTargetDirs) {
       await this.writeSkillTemplates(dir);
+    }
+  }
+
+  async unconfigureOpenCode(isGlobal: boolean): Promise<void> {
+    const targetFiles: string[] = [];
+    if (isGlobal) {
+      targetFiles.push(path.join(this.homeDir, '.config', 'opencode', 'config.json'));
+      if (process.platform === 'win32' && process.env.APPDATA) {
+        targetFiles.push(path.join(process.env.APPDATA, 'opencode', 'config.json'));
+      }
+    } else {
+      targetFiles.push(path.join(this.projectRoot, 'opencode.json'));
+    }
+
+    for (const targetFile of targetFiles) {
+      await this.mergeJsonConfig(targetFile, (current) => {
+        if (current.mcp) delete current.mcp['ai-browser-testing'];
+        if (current.mcpServers) delete current.mcpServers['ai-browser-testing'];
+        return current;
+      });
+    }
+
+    const skillsTargetDirs: string[] = [];
+    if (isGlobal) {
+      skillsTargetDirs.push(path.join(this.homeDir, '.config', 'opencode', 'skills'));
+      if (process.platform === 'win32' && process.env.APPDATA) {
+        skillsTargetDirs.push(path.join(process.env.APPDATA, 'opencode', 'skills'));
+      }
+    } else {
+      skillsTargetDirs.push(path.join(this.projectRoot, '.opencode', 'skills'));
+    }
+
+    for (const dir of skillsTargetDirs) {
+      await this.removeSkillTemplates(dir);
     }
   }
 
@@ -217,6 +304,32 @@ export class AgentInstaller {
     await this.writeSkillTemplates(claudeSkillsDir);
   }
 
+  async unconfigureClaude(isGlobal: boolean): Promise<void> {
+    let targetFile: string;
+    if (process.platform === 'win32') {
+      const appData = process.env.APPDATA || path.join(this.homeDir, 'AppData', 'Roaming');
+      targetFile = path.join(appData, 'Claude', 'claude_desktop_config.json');
+    } else if (process.platform === 'darwin') {
+      targetFile = path.join(this.homeDir, 'Library', 'Application Support', 'Claude', 'claude_desktop_config.json');
+    } else {
+      targetFile = path.join(this.homeDir, '.config', 'Claude', 'claude_desktop_config.json');
+    }
+
+    if (!isGlobal) {
+      targetFile = path.join(this.projectRoot, '.claude.json');
+    }
+
+    await this.mergeJsonConfig(targetFile, (current) => {
+      if (current.mcpServers) delete current.mcpServers['ai-browser-testing'];
+      return current;
+    });
+
+    const claudeSkillsDir = isGlobal
+      ? path.join(this.homeDir, '.claude', 'skills')
+      : path.join(this.projectRoot, '.claude', 'skills');
+    await this.removeSkillTemplates(claudeSkillsDir);
+  }
+
   async configureCursor(isGlobal: boolean): Promise<void> {
     const targetFile = isGlobal
       ? path.join(this.homeDir, '.cursor', 'mcp.json')
@@ -236,6 +349,22 @@ export class AgentInstaller {
       ? path.join(this.homeDir, '.cursor', 'rules')
       : path.join(this.projectRoot, '.cursor', 'rules');
     await this.writeSkillTemplates(cursorRulesDir);
+  }
+
+  async unconfigureCursor(isGlobal: boolean): Promise<void> {
+    const targetFile = isGlobal
+      ? path.join(this.homeDir, '.cursor', 'mcp.json')
+      : path.join(this.projectRoot, '.cursor', 'mcp.json');
+
+    await this.mergeJsonConfig(targetFile, (current) => {
+      if (current.mcpServers) delete current.mcpServers['ai-browser-testing'];
+      return current;
+    });
+
+    const cursorRulesDir = isGlobal
+      ? path.join(this.homeDir, '.cursor', 'rules')
+      : path.join(this.projectRoot, '.cursor', 'rules');
+    await this.removeSkillTemplates(cursorRulesDir);
   }
 
   async configureWindsurf(isGlobal: boolean): Promise<void> {
@@ -259,12 +388,35 @@ export class AgentInstaller {
     await this.writeSkillTemplates(windsurfSkillsDir);
   }
 
+  async unconfigureWindsurf(isGlobal: boolean): Promise<void> {
+    const targetFile = isGlobal
+      ? path.join(this.homeDir, '.codeium', 'windsurf', 'mcp_config.json')
+      : path.join(this.projectRoot, '.windsurf', 'mcp.json');
+
+    await this.mergeJsonConfig(targetFile, (current) => {
+      if (current.mcpServers) delete current.mcpServers['ai-browser-testing'];
+      return current;
+    });
+
+    const windsurfSkillsDir = isGlobal
+      ? path.join(this.homeDir, '.codeium', 'windsurf', 'skills')
+      : path.join(this.projectRoot, '.windsurf', 'skills');
+    await this.removeSkillTemplates(windsurfSkillsDir);
+  }
+
   private async writeSkillTemplates(targetBaseDir: string): Promise<void> {
     for (const [skillName, content] of Object.entries(SKILL_TEMPLATES)) {
       const skillDir = path.join(targetBaseDir, skillName);
       await fs.mkdir(skillDir, { recursive: true });
       const skillFile = path.join(skillDir, 'SKILL.md');
       await fs.writeFile(skillFile, content, 'utf-8');
+    }
+  }
+
+  private async removeSkillTemplates(targetBaseDir: string): Promise<void> {
+    for (const skillName of Object.keys(SKILL_TEMPLATES)) {
+      const skillDir = path.join(targetBaseDir, skillName);
+      await fs.rm(skillDir, { recursive: true, force: true }).catch(() => {});
     }
   }
 
@@ -295,10 +447,10 @@ export class AgentInstaller {
     console.log('==================================================');
     console.log('Pilih AI Agent yang ingin dikonfigurasi:');
     console.log('  1. Antigravity (MCP Server & Global Skills)');
-    console.log('  2. OpenCode (MCP Config)');
-    console.log('  3. Claude Code / Claude Desktop (MCP Config)');
-    console.log('  4. Cursor (MCP Config)');
-    console.log('  5. Windsurf / Roo Code (MCP Config)');
+    console.log('  2. OpenCode (MCP Config & Global Skills)');
+    console.log('  3. Claude Code / Claude Desktop (MCP Config & Skills)');
+    console.log('  4. Cursor (MCP Config & Rules)');
+    console.log('  5. Windsurf / Roo Code (MCP Config & Skills)');
     console.log('  A. Semua Agent di atas (All)');
 
     const answer = (await question('\nPilihan Anda [1-5 atau A] (Default: A): ')).trim().toLowerCase();
@@ -328,5 +480,53 @@ export class AgentInstaller {
     }
 
     console.log('\n🎉 Setup Selesai! AI Agent Anda siap digunakan untuk web testing.');
+  }
+
+  static async promptInteractiveUninstall(): Promise<void> {
+    const rl = readline.createInterface({
+      input: process.stdin,
+      output: process.stdout,
+    });
+
+    const question = (query: string): Promise<string> =>
+      new Promise((resolve) => rl.question(query, resolve));
+
+    console.log('\n🗑️  AI Web Testing — Uninstaller Wizard');
+    console.log('==========================================');
+    console.log('Pilih AI Agent yang ingin di-uninstall (Hapus MCP & Skills):');
+    console.log('  1. Antigravity');
+    console.log('  2. OpenCode');
+    console.log('  3. Claude Code / Claude Desktop');
+    console.log('  4. Cursor');
+    console.log('  5. Windsurf / Roo Code');
+    console.log('  A. Semua Agent di atas (All)');
+
+    const answer = (await question('\nPilihan Anda [1-5 atau A] (Default: A): ')).trim().toLowerCase();
+    const scopeAnswer = (await question('Hapus dari Global System? [Y/n] (Default: Y): ')).trim().toLowerCase();
+    rl.close();
+
+    const isGlobal = scopeAnswer !== 'n';
+    let selectedAgents: SupportedAgent[] = [];
+
+    if (answer === '1') selectedAgents = ['antigravity'];
+    else if (answer === '2') selectedAgents = ['opencode'];
+    else if (answer === '3') selectedAgents = ['claude'];
+    else if (answer === '4') selectedAgents = ['cursor'];
+    else if (answer === '5') selectedAgents = ['windsurf'];
+    else selectedAgents = ['antigravity', 'opencode', 'claude', 'cursor', 'windsurf'];
+
+    console.log(`\n🧹 Menghapus MCP & Skills untuk: ${selectedAgents.join(', ')}...\n`);
+
+    const installer = new AgentInstaller();
+    const result = await installer.uninstallForAgents(selectedAgents, isGlobal);
+
+    for (const s of result.uninstalled) {
+      console.log(`✅ Berhasil dihapus: ${s}`);
+    }
+    for (const e of result.errors) {
+      console.log(`⚠️ Gagal: ${e}`);
+    }
+
+    console.log('\n✨ Uninstall Selesai. Sistem AI Agent Anda telah bersih.');
   }
 }

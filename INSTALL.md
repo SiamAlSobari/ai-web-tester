@@ -216,6 +216,39 @@ Now you can execute `ai-test` anywhere in your terminal pointing to your local s
 
 ---
 
+## 🗑️ Clean Uninstallation (Removing MCP & Skills)
+
+If you ever need to remove `ai-web-tester` MCP server and skills from your AI coding agents:
+
+### 1. Interactive Uninstaller Wizard
+```bash
+npx ai-test uninstall
+```
+Select the agent you want to clean up:
+```text
+🗑️  AI Web Testing — Uninstaller Wizard
+==========================================
+Pilih AI Agent yang ingin di-uninstall (Hapus MCP & Skills):
+  1. Antigravity
+  2. OpenCode
+  3. Claude Code / Claude Desktop
+  4. Cursor
+  5. Windsurf / Roo Code
+  A. Semua Agent di atas (All)
+```
+
+### 2. Direct Uninstaller via Flags
+```bash
+# Remove from specific agent
+npx ai-test uninstall -a opencode
+
+# Remove from ALL agents at once
+npx ai-test uninstall -a antigravity opencode claude cursor windsurf
+```
+This cleanly deletes the generated skill directories (`web-test`, `web-test-all`, `web-test-fix`) and removes `ai-browser-testing` entries from the agent configuration files without affecting other tools.
+
+---
+
 ## ❓ Troubleshooting & FAQs
 
 ### Q: Playwright browser fails to launch or says "Executable doesn't exist"
