@@ -1,0 +1,50 @@
+{
+  "name": "ai-web-tester",
+  "version": "0.1.0",
+  "description": "Autonomous browser testing engine & MCP toolset for AI coding agents",
+  "repository": "https://github.com/SiamAlSobari/ai-web-tester.git",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "bin": {
+    "ai-test": "./dist/cli.js",
+    "ai-test-mcp": "./dist/mcp.js"
+  },
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "start": "node dist/cli.js",
+    "mcp": "node dist/mcp.js",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit"
+  },
+  "keywords": [
+    "mcp",
+    "playwright",
+    "ai-agent",
+    "browser-testing",
+    "automation",
+    "qa",
+    "antigravity",
+    "claude-code"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.4.1",
+    "commander": "^13.1.0",
+    "handlebars": "^4.7.8",
+    "playwright": "^1.49.1",
+    "zod": "^3.24.1"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.2",
+    "tsup": "^8.3.5",
+    "typescript": "^5.7.2",
+    "vitest": "^3.0.0"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}
