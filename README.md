@@ -15,6 +15,9 @@
 
 </div>
 
+> [!IMPORTANT]
+> 📖 **Looking for step-by-step setup instructions or local development setup?** Check out the [**Complete Installation & Setup Guide (INSTALL.md)**](INSTALL.md) for 1-command installer wizards, agent-specific guides (OpenCode, Antigravity, Claude Code, Cursor, Windsurf), and troubleshooting tips.
+
 ---
 
 ## 💡 The Missing Piece in AI Coding
