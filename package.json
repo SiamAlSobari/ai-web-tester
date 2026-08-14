@@ -2,13 +2,28 @@
   "name": "ai-web-tester",
   "version": "0.1.0",
   "description": "Autonomous browser testing engine & MCP toolset for AI coding agents",
-  "repository": "https://github.com/SiamAlSobari/ai-web-tester.git",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/SiamAlSobari/ai-web-tester.git"
+  },
+  "homepage": "https://github.com/SiamAlSobari/ai-web-tester#readme",
+  "bugs": {
+    "url": "https://github.com/SiamAlSobari/ai-web-tester/issues"
+  },
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "bin": {
-    "ai-test": "./dist/cli.js",
-    "ai-test-mcp": "./dist/mcp.js"
+    "ai-test": "dist/cli.js",
+    "ai-test-mcp": "dist/mcp.js"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "publishConfig": {
+    "access": "public"
   },
   "scripts": {
     "build": "tsup",
@@ -17,7 +32,8 @@
     "mcp": "node dist/mcp.js",
     "test": "vitest run",
     "test:watch": "vitest",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "prepublishOnly": "npm run typecheck && npm run build && npm test"
   },
   "keywords": [
     "mcp",
@@ -26,10 +42,12 @@
     "browser-testing",
     "automation",
     "qa",
+    "opencode",
     "antigravity",
-    "claude-code"
+    "claude-code",
+    "cursor"
   ],
-  "author": "",
+  "author": "Siam Al Sobari",
   "license": "MIT",
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.4.1",

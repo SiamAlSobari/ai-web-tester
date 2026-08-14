@@ -6,3 +6,5 @@ test-reports/
 artifacts/
 .DS_Store
 *.log
+.npmrc
+.env
