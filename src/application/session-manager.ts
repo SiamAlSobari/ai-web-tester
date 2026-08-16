@@ -77,7 +77,54 @@ export class SessionManager {
     };
   }
 
+  async saveAuthState(customPath?: string): Promise<{ filepath: string }> {
+    this.ensureActiveSession();
+    const artifactDir = path.resolve(process.cwd(), 'artifacts', 'auth');
+    await fs.mkdir(artifactDir, { recursive: true });
+    const targetFile = customPath || path.join(artifactDir, `auth-${Date.now()}.json`);
+    const savedPath = await this.driver.saveStorageState(targetFile);
+    return { filepath: savedPath };
+  }
+
+  getTabs(): Array<{ index: number; url: string; title: string; isActive: boolean }> {
+    this.ensureActiveSession();
+    return this.driver.getPages();
+  }
+
+  async switchTab(tabIndex: number): Promise<{ session: Session; state: PageState; llmContext: string }> {
+    const session = this.ensureActiveSession();
+    await this.driver.switchPage(tabIndex);
+
+    // Re-attach telemetry to the newly active page if driver is PlaywrightDriver
+    if (this.driver instanceof PlaywrightDriver) {
+      const page = this.driver.getPage();
+      if (page) {
+        this.telemetry.attach(page);
+      }
+    }
+
+    const state = await this.stateExtractor.extractCurrentState();
+    session.updateState(state);
+    return {
+      session,
+      state,
+      llmContext: state.toLLMContext(),
+    };
+  }
+
+  async saveTrace(customPath?: string): Promise<{ filepath: string }> {
+    this.ensureActiveSession();
+    const traceDir = path.resolve(process.cwd(), 'artifacts', 'traces');
+    await fs.mkdir(traceDir, { recursive: true });
+    const targetFile = customPath || path.join(traceDir, `trace-${Date.now()}.zip`);
+    if (this.driver instanceof PlaywrightDriver) {
+      await this.driver.stopTracing(targetFile);
+    }
+    return { filepath: targetFile };
+  }
+
   async takeScreenshot(name?: string, fullPage = false): Promise<{ filepath: string }> {
+
     const session = this.ensureActiveSession();
     const artifactName = name ? (name.endsWith('.png') ? name : `${name}.png`) : `screenshot-${Date.now()}.png`;
     const artifactDir = path.resolve(process.cwd(), 'artifacts');

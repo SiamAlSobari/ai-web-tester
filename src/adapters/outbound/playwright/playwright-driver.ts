@@ -1,4 +1,6 @@
-import { chromium, type Browser, type BrowserContext, type Page, type Locator } from 'playwright';
+import path from 'node:path';
+import fs from 'node:fs/promises';
+import { chromium, devices, type Browser, type BrowserContext, type Page, type Locator, type CDPSession } from 'playwright';
 import { IBrowserDriver, LaunchOptions, InteractiveScanResult } from '../../../domain/interfaces/browser-driver.interface.js';
 import { ElementRef } from '../../../domain/value-objects/element-ref.vo.js';
 import { ElementNotFoundError, NavigationTimeoutError, ActionExecutionError } from '../../../shared/errors/domain-errors.js';
@@ -8,7 +10,10 @@ export class PlaywrightDriver implements IBrowserDriver {
   private browser: Browser | null = null;
   private context: BrowserContext | null = null;
   private page: Page | null = null;
+  private cdpSession: CDPSession | null = null;
   private unregisterGuard: (() => void) | null = null;
+  private isTracingActive = false;
+
 
   // In-memory mapping of active refId to Playwright Locator
   private readonly locatorCache: Map<number, Locator> = new Map();
@@ -24,12 +29,51 @@ export class PlaywrightDriver implements IBrowserDriver {
       args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage'],
     });
 
-    this.context = await this.browser.newContext({
+    let contextOptions: Parameters<Browser['newContext']>[0] = {
       viewport: options?.viewport ?? { width: 1280, height: 720 },
       ignoreHTTPSErrors: true,
+    };
+
+    if (options?.device && devices[options.device]) {
+      contextOptions = {
+        ...contextOptions,
+        ...devices[options.device],
+      };
+    }
+
+    if (options?.storageState) {
+      contextOptions.storageState = options.storageState;
+    }
+
+    this.context = await this.browser.newContext(contextOptions);
+
+    if (options?.recordTrace) {
+      await this.context.tracing.start({ screenshots: true, snapshots: true, sources: true });
+      this.isTracingActive = true;
+    }
+
+    // Network Throttling simulation via CDP
+    if (options?.networkProfile && options.networkProfile !== 'None') {
+      const page = await this.context.newPage();
+      this.page = page;
+      await this.applyNetworkProfile(options.networkProfile);
+    } else {
+      this.page = await this.context.newPage();
+    }
+
+    // Auto-track popups / multi-tabs
+    this.context.on('page', (newPage) => {
+      newPage.on('close', () => {
+        if (this.page === newPage) {
+          const pages = this.context?.pages() || [];
+          this.page = pages[0] || null;
+          this.locatorCache.clear();
+          this.elementRefCache.clear();
+        }
+      });
     });
 
-    this.page = await this.context.newPage();
+
     if (options?.timeoutMs) {
       this.page.setDefaultTimeout(options.timeoutMs);
     }
@@ -39,6 +83,7 @@ export class PlaywrightDriver implements IBrowserDriver {
       await this.close();
     });
   }
+
 
   getPage(): Page | null {
     return this.page;
@@ -227,7 +272,132 @@ export class PlaywrightDriver implements IBrowserDriver {
     }
   }
 
+  async uploadFile(ref: number, filePaths: string[], timeoutMs = 10000): Promise<void> {
+    const loc = this.getLocator(ref);
+    try {
+      await loc.scrollIntoViewIfNeeded({ timeout: timeoutMs }).catch(() => {});
+      await loc.setInputFiles(filePaths, { timeout: timeoutMs });
+    } catch (err: unknown) {
+      throw new ActionExecutionError('upload', err instanceof Error ? err.message : String(err), { ref, filePaths });
+    }
+  }
+
+  async waitForDownload(triggerFn: () => Promise<void>, savePath?: string): Promise<string> {
+    this.ensureReady();
+    try {
+      const downloadPromise = this.page!.waitForEvent('download', { timeout: 30000 });
+      await triggerFn();
+      const download = await downloadPromise;
+      const targetDir = savePath ? path.dirname(savePath) : path.resolve(process.cwd(), 'artifacts', 'downloads');
+      await fs.mkdir(targetDir, { recursive: true });
+      const targetFile = savePath || path.join(targetDir, download.suggestedFilename());
+      await download.saveAs(targetFile);
+      return targetFile;
+    } catch (err: unknown) {
+      throw new ActionExecutionError('download', err instanceof Error ? err.message : String(err), { savePath });
+    }
+  }
+
+  async saveStorageState(filepath: string): Promise<string> {
+    this.ensureReady();
+    try {
+      await fs.mkdir(path.dirname(filepath), { recursive: true });
+      await this.context!.storageState({ path: filepath });
+      return filepath;
+    } catch (err: unknown) {
+      throw new ActionExecutionError('saveStorageState', err instanceof Error ? err.message : String(err), { filepath });
+    }
+  }
+
+  async loadStorageState(filepath: string): Promise<void> {
+    this.ensureReady();
+    try {
+      const raw = await fs.readFile(filepath, 'utf-8');
+      const data = JSON.parse(raw);
+      if (data.cookies && Array.isArray(data.cookies)) {
+        await this.context!.addCookies(data.cookies);
+      }
+    } catch (err: unknown) {
+      throw new ActionExecutionError('loadStorageState', err instanceof Error ? err.message : String(err), { filepath });
+    }
+  }
+
+  getPages(): Array<{ index: number; url: string; title: string; isActive: boolean }> {
+    if (!this.context) return [];
+    const pages = this.context.pages();
+    return pages.map((p, idx) => ({
+      index: idx,
+      url: p.url(),
+      title: '',
+      isActive: p === this.page,
+    }));
+  }
+
+  async switchPage(index: number): Promise<void> {
+    if (!this.context) {
+      throw new ActionExecutionError('switchPage', 'No active browser context.');
+    }
+    const pages = this.context.pages();
+    if (index < 0 || index >= pages.length) {
+      throw new ActionExecutionError('switchPage', `Tab index ${index} out of range (total tabs: ${pages.length})`);
+    }
+    const targetPage = pages[index];
+    if (!targetPage) {
+      throw new ActionExecutionError('switchPage', `Page at index ${index} not found.`);
+    }
+    this.page = targetPage;
+    this.locatorCache.clear();
+    this.elementRefCache.clear();
+    await this.page.bringToFront().catch(() => {});
+  }
+
+
+
+  async stopTracing(tracePath: string): Promise<void> {
+    if (this.context && this.isTracingActive) {
+      await fs.mkdir(path.dirname(tracePath), { recursive: true });
+      await this.context.tracing.stop({ path: tracePath });
+      this.isTracingActive = false;
+    }
+  }
+
+  private async applyNetworkProfile(profile: 'Fast 3G' | 'Slow 3G' | 'Offline'): Promise<void> {
+    if (!this.page) return;
+    try {
+      if (this.cdpSession) {
+        await this.cdpSession.detach().catch(() => {});
+        this.cdpSession = null;
+      }
+      this.cdpSession = await this.page.context().newCDPSession(this.page);
+      if (profile === 'Offline') {
+        await this.cdpSession.send('Network.emulateNetworkConditions', {
+          offline: true,
+          latency: 0,
+          downloadThroughput: 0,
+          uploadThroughput: 0,
+        });
+      } else if (profile === 'Slow 3G') {
+        await this.cdpSession.send('Network.emulateNetworkConditions', {
+          offline: false,
+          latency: 400,
+          downloadThroughput: (500 * 1024) / 8,
+          uploadThroughput: (500 * 1024) / 8,
+        });
+      } else if (profile === 'Fast 3G') {
+        await this.cdpSession.send('Network.emulateNetworkConditions', {
+          offline: false,
+          latency: 150,
+          downloadThroughput: (1.6 * 1024 * 1024) / 8,
+          uploadThroughput: (750 * 1024) / 8,
+        });
+      }
+    } catch {
+      // Ignore if CDP not supported
+    }
+  }
+
   async captureScreenshot(filepath: string, fullPage = false): Promise<string> {
+
     this.ensureReady();
     try {
       await this.page!.screenshot({ path: filepath, fullPage });
@@ -254,6 +424,11 @@ export class PlaywrightDriver implements IBrowserDriver {
       this.unregisterGuard = null;
     }
 
+    if (this.cdpSession) {
+      await this.cdpSession.detach().catch(() => {});
+      this.cdpSession = null;
+    }
+
     if (this.page) {
       await this.page.close().catch(() => {});
       this.page = null;
@@ -267,6 +442,7 @@ export class PlaywrightDriver implements IBrowserDriver {
       this.browser = null;
     }
   }
+
 
   isAlive(): boolean {
     return this.browser !== null && this.page !== null && !this.page.isClosed();

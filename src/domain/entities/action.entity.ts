@@ -1,7 +1,7 @@
 /**
  * Represents an action executed on the browser during a test run.
  */
-export type ActionType = 'navigate' | 'click' | 'fill' | 'hover' | 'press' | 'select' | 'scroll' | 'screenshot';
+export type ActionType = 'navigate' | 'click' | 'fill' | 'hover' | 'press' | 'select' | 'scroll' | 'upload' | 'download' | 'switch_tab' | 'screenshot';
 export type ActionStatus = 'PENDING' | 'PASSED' | 'FAILED';
 
 export interface ActionProps {
@@ -11,7 +11,9 @@ export interface ActionProps {
   targetRef?: number;
   targetDescription?: string;
   value?: string;
+  filePaths?: string[];
   status: ActionStatus;
+
   startedAt: string;
   endedAt?: string;
   durationMs?: number;
@@ -26,6 +28,7 @@ export class Action {
   readonly targetRef?: number;
   readonly targetDescription?: string;
   readonly value?: string;
+  readonly filePaths?: string[];
   status: ActionStatus;
   readonly startedAt: string;
   endedAt?: string;
@@ -40,6 +43,7 @@ export class Action {
     this.targetRef = props.targetRef;
     this.targetDescription = props.targetDescription;
     this.value = props.value;
+    this.filePaths = props.filePaths;
     this.status = props.status;
     this.startedAt = props.startedAt;
     this.endedAt = props.endedAt;
@@ -48,7 +52,7 @@ export class Action {
     this.screenshotPath = props.screenshotPath;
   }
 
-  static create(stepNumber: number, type: ActionType, options?: { targetRef?: number; targetDescription?: string; value?: string }): Action {
+  static create(stepNumber: number, type: ActionType, options?: { targetRef?: number; targetDescription?: string; value?: string; filePaths?: string[] }): Action {
     return new Action({
       id: `act-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
       stepNumber,
@@ -56,10 +60,12 @@ export class Action {
       targetRef: options?.targetRef,
       targetDescription: options?.targetDescription,
       value: options?.value,
+      filePaths: options?.filePaths,
       status: 'PENDING',
       startedAt: new Date().toISOString(),
     });
   }
+
 
   complete(screenshotPath?: string): void {
     this.status = 'PASSED';

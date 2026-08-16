@@ -5,16 +5,19 @@ import { SessionManager } from '../../../application/session-manager.js';
 import { PlaywrightDriver } from '../../outbound/playwright/playwright-driver.js';
 import { PlaywrightTelemetryObserver } from '../../outbound/telemetry/telemetry-observer.js';
 import { MarkdownReporter } from '../../outbound/reporter/markdown-reporter.js';
+import { SitemapCrawler } from '../../../application/crawler/sitemap-crawler.js';
+import { A11yAuditor } from '../../outbound/a11y/a11y-auditor.js';
 
 export function createMcpServer(sessionManager?: SessionManager): McpServer {
   const driver = new PlaywrightDriver();
   const telemetry = new PlaywrightTelemetryObserver();
   const reporter = new MarkdownReporter();
   const manager = sessionManager ?? new SessionManager(driver, telemetry, reporter);
+  const a11yAuditor = new A11yAuditor();
 
   const server = new McpServer({
     name: 'ai-browser-testing',
-    version: '0.1.0',
+    version: '0.2.0',
   });
 
   // Tool 1: browser_open
@@ -26,13 +29,21 @@ export function createMcpServer(sessionManager?: SessionManager): McpServer {
       headless: z.boolean().optional().default(true).describe('Run browser in headless background mode (default true for lightweight execution)'),
       width: z.number().optional().default(1280).describe('Browser viewport width'),
       height: z.number().optional().default(720).describe('Browser viewport height'),
+      device: z.string().optional().describe('Mobile device preset to emulate (e.g. "iPhone 15", "Pixel 7", "iPad Pro 11")'),
+      storageState: z.string().optional().describe('Path to saved auth state JSON file (cookies/localStorage)'),
+      networkProfile: z.enum(['None', 'Fast 3G', 'Slow 3G', 'Offline']).optional().default('None').describe('Network throttling profile'),
+      recordTrace: z.boolean().optional().default(false).describe('Record full Playwright trace (.zip) for deep debugging'),
     },
-    async ({ url, headless, width, height }) => {
+    async ({ url, headless, width, height, device, storageState, networkProfile, recordTrace }) => {
       try {
         const { state } = await manager.startSession({
           url,
           headless,
           viewport: { width, height },
+          device,
+          storageState,
+          networkProfile,
+          recordTrace,
         });
 
         return {
@@ -56,21 +67,23 @@ export function createMcpServer(sessionManager?: SessionManager): McpServer {
   // Tool 2: browser_act
   server.tool(
     'browser_act',
-    'Executes an interaction on a referenced element (click, fill, hover, press, select, scroll, screenshot).',
+    'Executes an interaction on a referenced element (click, fill, hover, press, select, scroll, upload, download, switch_tab, screenshot).',
     {
       action: z
-        .enum(['click', 'fill', 'hover', 'press', 'select', 'scroll', 'screenshot'])
-        .describe('Action type to execute (click, fill, hover, press, select, scroll, screenshot)'),
-      ref: z.number().optional().describe('Element ref ID to interact with, or element to scroll into view'),
-      value: z.string().optional().describe('Value to fill, key to press, option to select, or scroll direction ("down", "up", "bottom", "top", or pixel number)'),
+        .enum(['click', 'fill', 'hover', 'press', 'select', 'scroll', 'upload', 'download', 'switch_tab', 'screenshot'])
+        .describe('Action type to execute'),
+      ref: z.number().optional().describe('Element ref ID to interact with, or element to scroll into view / upload to / download from'),
+      value: z.string().optional().describe('Value to fill, key to press, option to select, download save path, or scroll direction ("down", "up", "bottom", "top")'),
+      filePaths: z.array(z.string()).optional().describe('Array of absolute file paths if action is upload'),
       screenshotName: z.string().optional().describe('Custom name if action is screenshot'),
     },
-    async ({ action, ref, value, screenshotName }) => {
+    async ({ action, ref, value, filePaths, screenshotName }) => {
       try {
         const result = await manager.executeAction({
           type: action,
           ref,
           value,
+          filePaths,
           screenshotName,
         });
 
@@ -147,7 +160,128 @@ export function createMcpServer(sessionManager?: SessionManager): McpServer {
     }
   );
 
-  // Tool 5: browser_report
+  // Tool 5: browser_switch_tab
+  server.tool(
+    'browser_switch_tab',
+    'Lists open tabs or switches active browser tab/popup by index.',
+    {
+      tabIndex: z.number().optional().describe('Zero-based index of the tab to activate. If omitted, returns list of open tabs.'),
+    },
+    async ({ tabIndex }) => {
+      try {
+        if (tabIndex === undefined) {
+          const tabs = manager.getTabs();
+          const tabList = tabs.map((t) => `[Tab ${t.index}] ${t.isActive ? '👉 (Active)' : ''} URL: ${t.url}`).join('\n');
+          return {
+            content: [{ type: 'text', text: `📑 Open Tabs (${tabs.length}):\n\n${tabList}` }],
+          };
+        }
+
+        const result = await manager.switchTab(tabIndex);
+        return {
+          content: [
+            {
+              type: 'text',
+              text: `🔄 Switched to Tab ${tabIndex}\n\n${result.llmContext}`,
+            },
+          ],
+        };
+      } catch (err: unknown) {
+        const errorMsg = err instanceof Error ? err.message : String(err);
+        return {
+          isError: true,
+          content: [{ type: 'text', text: `❌ Failed to switch tab: ${errorMsg}` }],
+        };
+      }
+    }
+  );
+
+  // Tool 6: browser_save_auth
+  server.tool(
+    'browser_save_auth',
+    'Saves current browser session cookies and localStorage to a JSON file for re-use in future tests.',
+    {
+      path: z.string().optional().describe('Custom file path to save auth JSON (defaults to ./artifacts/auth/auth-[timestamp].json)'),
+    },
+    async ({ path: customPath }) => {
+      try {
+        const result = await manager.saveAuthState(customPath);
+        return {
+          content: [
+            {
+              type: 'text',
+              text: `💾 Auth state saved successfully to: ${result.filepath}\nUse this path in future browser_open calls via storageState parameter.`,
+            },
+          ],
+        };
+      } catch (err: unknown) {
+        const errorMsg = err instanceof Error ? err.message : String(err);
+        return {
+          isError: true,
+          content: [{ type: 'text', text: `❌ Failed to save auth state: ${errorMsg}` }],
+        };
+      }
+    }
+  );
+
+  // Tool 7: browser_audit_a11y
+  server.tool(
+    'browser_audit_a11y',
+    'Runs automated WCAG 2.1 AA accessibility audit on the active page via axe-core.',
+    {},
+    async () => {
+      try {
+        const activeDriver = (manager as unknown as { driver: PlaywrightDriver }).driver;
+        const page = activeDriver?.getPage();
+        if (!page) {
+          throw new Error('No active page to audit.');
+        }
+
+        const result = await a11yAuditor.audit(page);
+        const markdown = a11yAuditor.toMarkdownSummary(result);
+        return {
+          content: [{ type: 'text', text: markdown }],
+        };
+      } catch (err: unknown) {
+        const errorMsg = err instanceof Error ? err.message : String(err);
+        return {
+          isError: true,
+          content: [{ type: 'text', text: `❌ A11y audit failed: ${errorMsg}` }],
+        };
+      }
+    }
+  );
+
+  // Tool 8: browser_crawl
+  server.tool(
+    'browser_crawl',
+    'Autonomously explores internal website routes, builds sitemap hierarchy tree, and detects 404/broken links.',
+    {
+      url: z.string().url().describe('The root URL to start crawling from'),
+      maxDepth: z.number().optional().default(3).describe('Maximum crawl depth (default 3)'),
+      maxPages: z.number().optional().default(20).describe('Maximum pages to visit (default 20)'),
+    },
+    async ({ url, maxDepth, maxPages }) => {
+      try {
+        const crawlDriver = new PlaywrightDriver();
+        const crawler = new SitemapCrawler(crawlDriver);
+        const result = await crawler.crawl(url, { maxDepth, maxPages });
+        const markdown = crawler.toMarkdownReport(result);
+        await crawlDriver.close();
+        return {
+          content: [{ type: 'text', text: markdown }],
+        };
+      } catch (err: unknown) {
+        const errorMsg = err instanceof Error ? err.message : String(err);
+        return {
+          isError: true,
+          content: [{ type: 'text', text: `❌ Crawl failed: ${errorMsg}` }],
+        };
+      }
+    }
+  );
+
+  // Tool 9: browser_report
   server.tool(
     'browser_report',
     'Compiles all test steps, captured console errors, failed assertions, and screenshots into a Markdown (.md) test report file.',
@@ -176,7 +310,7 @@ export function createMcpServer(sessionManager?: SessionManager): McpServer {
     }
   );
 
-  // Tool 6: browser_close
+  // Tool 10: browser_close
   server.tool(
     'browser_close',
     'Closes current active browser testing session and releases system resources.',

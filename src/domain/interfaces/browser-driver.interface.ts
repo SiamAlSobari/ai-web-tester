@@ -4,6 +4,10 @@ export interface LaunchOptions {
   headless?: boolean;
   viewport?: { width: number; height: number };
   timeoutMs?: number;
+  storageState?: string;
+  device?: string;
+  networkProfile?: 'None' | 'Fast 3G' | 'Slow 3G' | 'Offline';
+  recordTrace?: boolean;
 }
 
 export interface InteractiveScanResult {
@@ -22,6 +26,12 @@ export interface IBrowserDriver {
   press(key: string): Promise<void>;
   selectOption(ref: number, value: string, timeoutMs?: number): Promise<void>;
   scroll(directionOrPixels?: string | number, ref?: number): Promise<void>;
+  uploadFile(ref: number, filePaths: string[], timeoutMs?: number): Promise<void>;
+  waitForDownload(triggerFn: () => Promise<void>, savePath?: string): Promise<string>;
+  saveStorageState(filepath: string): Promise<string>;
+  loadStorageState(filepath: string): Promise<void>;
+  getPages(): Array<{ index: number; url: string; title: string; isActive: boolean }>;
+  switchPage(index: number): Promise<void>;
   scanInteractiveElements(): Promise<InteractiveScanResult>;
   captureScreenshot(filepath: string, fullPage?: boolean): Promise<string>;
   getUrl(): string;
@@ -29,3 +39,4 @@ export interface IBrowserDriver {
   close(): Promise<void>;
   isAlive(): boolean;
 }
+

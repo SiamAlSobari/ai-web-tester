@@ -124,28 +124,32 @@ node dist/cli.js init -a antigravity opencode claude cursor windsurf
 
 ## 🛠️ Model Context Protocol (MCP) Tools
 
-When connected via MCP, your AI coding agent gains access to 6 specialized tools:
+When connected via MCP, your AI coding agent gains access to **10 specialized enterprise-grade tools**:
 
 ```text
-┌─────────────────────────────────────────────────────────────┐
-│                    AI Web Tester MCP Engine                 │
-└──────────────────────────────┬──────────────────────────────┘
-                               │
-   ┌───────────────────────────┼───────────────────────────┐
-   ▼                           ▼                           ▼
-browser_open               browser_act              browser_inspect
-(Launch & scan DOM)     (click, fill, scroll)     (Refresh state & logs)
-   │                           │                           │
-   ▼                           ▼                           ▼
-browser_screenshot          browser_report           browser_close
-(Capture image artifact)   (Export .md summary)     (Clean session teardown)
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                          AI Web Tester MCP Engine                           │
+└──────────────────────────────────────┬──────────────────────────────────────┘
+                                       │
+    ┌───────────────────┬──────────────┴───────┬───────────────────┐
+    ▼                   ▼                      ▼                   ▼
+browser_open       browser_act            browser_inspect     browser_switch_tab
+(Launch & scan)   (Click, fill, upload)  (State & telemetry)  (Multi-tab/popups)
+    │                   │                      │                   │
+    ▼                   ▼                      ▼                   ▼
+browser_save_auth  browser_audit_a11y     browser_crawl       browser_report
+(Save login state) (WCAG 2.1 AA audit)   (Sitemap & 404s)    (Export .md summary)
 ```
 
 | Tool Name | Key Parameters | Description |
 | :--- | :--- | :--- |
-| `browser_open` | `url` *(required)*, `headless?`, `width?`, `height?` | Opens the target URL in Chromium, extracts interactive elements with ref IDs, and returns initial state. |
-| `browser_act` | `action` *(click, fill, hover, press, select, scroll, screenshot)*, `ref?`, `value?` | Executes an interaction on a referenced element with built-in auto-scroll and retry logic. |
+| `browser_open` | `url` *(required)*, `headless?`, `device?`, `storageState?`, `networkProfile?`, `recordTrace?` | Opens the target URL in Chromium, applies device presets, loads auth states, and returns initial ARIA state. |
+| `browser_act` | `action` *(click, fill, hover, press, select, scroll, upload, download, switch_tab, screenshot)*, `ref?`, `value?`, `filePaths?` | Executes an interaction on a referenced element with retry logic, file I/O, or download interception. |
 | `browser_inspect` | _(none)_ | Refreshes and returns the active page state, interactive refs, and captured runtime errors. |
+| `browser_switch_tab` | `tabIndex?` | Switches active browser focus between multiple tabs or OAuth popups, or lists all open tabs. |
+| `browser_save_auth` | `path?` | Saves active browser session cookies and localStorage to JSON for re-use in future tests. |
+| `browser_audit_a11y` | _(none)_ | Runs an automated WCAG 2.1 AA accessibility audit via `axe-core` and returns findings. |
+| `browser_crawl` | `url` *(required)*, `maxDepth?`, `maxPages?` | Autonomously explores all internal routes, maps sitemap hierarchy, and identifies 404 broken links. |
 | `browser_screenshot` | `name?`, `fullPage?` | Manually captures a visual screenshot and saves it to `./artifacts/`. |
 | `browser_report` | `title?`, `outputPath?` | Compiles test execution history, telemetry, and screenshots into a structured `.md` report. |
 | `browser_close` | _(none)_ | Safely terminates the browser session and frees all system memory. |
@@ -157,15 +161,22 @@ browser_screenshot          browser_report           browser_close
 You can also run automated browser tests directly from your terminal:
 
 ```bash
-# 1. Quick inspection of interactive elements on any page
-node dist/cli.js open http://localhost:3000
+# 1. Quick inspection of interactive elements on any page (with optional device preset)
+node dist/cli.js open http://localhost:3000 -d "iPhone 15"
 
-# 2. Run automated health check & compile a Markdown report
-node dist/cli.js test http://localhost:3000 --title "Homepage Smoke Test"
+# 2. Run automated health check & compile a Markdown report with Playwright trace
+node dist/cli.js test http://localhost:3000 --title "Homepage Smoke Test" --trace
 
-# 3. Start the MCP Server over stdio manually
+# 3. Autonomously crawl internal website routes & build sitemap
+node dist/cli.js crawl http://localhost:3000 --depth 3 --pages 20
+
+# 4. Start local interactive web dashboard
+node dist/cli.js ui --port 3100
+
+# 5. Start the MCP Server over stdio manually
 node dist/cli.js serve-mcp
 ```
+
 
 ---
 

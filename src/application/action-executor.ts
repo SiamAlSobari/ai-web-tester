@@ -11,6 +11,7 @@ export interface ExecuteActionParams {
   type: ActionType;
   ref?: number;
   value?: string;
+  filePaths?: string[];
   screenshotName?: string;
 }
 
@@ -36,6 +37,7 @@ export class ActionExecutor {
       targetRef: params.ref,
       targetDescription,
       value: params.value,
+      filePaths: params.filePaths,
     });
     session.recordAction(action);
 
@@ -117,6 +119,22 @@ export class ActionExecutor {
           case 'scroll':
             await this.driver.scroll(params.value || 'down', params.ref);
             return;
+          case 'upload':
+            if (params.ref === undefined) throw new Error('Ref ID required for upload action');
+            if (!params.filePaths || params.filePaths.length === 0) throw new Error('filePaths required for upload action');
+            await this.driver.uploadFile(params.ref, params.filePaths);
+            return;
+          case 'download':
+            if (params.ref === undefined) throw new Error('Ref ID required for download trigger');
+            await this.driver.waitForDownload(async () => {
+              await this.driver.click(params.ref!);
+            }, params.value);
+            return;
+          case 'switch_tab': {
+            const tabIdx = params.value ? parseInt(params.value, 10) : (params.ref ?? 0);
+            await this.driver.switchPage(tabIdx);
+            return;
+          }
           case 'screenshot': {
             const artifactName = params.screenshotName || `screenshot-step-${Date.now()}.png`;
             const artifactDir = path.resolve(process.cwd(), 'artifacts');
@@ -138,6 +156,7 @@ export class ActionExecutor {
 
     throw lastError;
   }
+
 
   private buildActionSummary(action: Action, state: PageState): string {
     const lines = [
