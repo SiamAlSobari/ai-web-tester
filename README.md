@@ -6,8 +6,10 @@
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.7-blue.svg?style=flat-square&logo=typescript)](https://www.typescriptlang.org/)
 [![Playwright](https://img.shields.io/badge/Playwright-1.49-green.svg?style=flat-square&logo=playwright)](https://playwright.dev/)
 [![Model Context Protocol](https://img.shields.io/badge/MCP-Protocol-purple.svg?style=flat-square)](https://modelcontextprotocol.io/)
+[![M8ven Verified](https://m8ven.ai/badge/mcp/siamalsobari-ai-web-tester-a1ng3r?variant=verified)](https://m8ven.ai/mcp/siamalsobari-ai-web-tester-a1ng3r)
 [![Node.js](https://img.shields.io/badge/Node.js-%3E%3D20.x-339933.svg?style=flat-square&logo=nodedotjs)](https://nodejs.org/)
 [![License](https://img.shields.io/badge/License-MIT-orange.svg?style=flat-square)](LICENSE)
+
 
 <p align="center">
   <b>Give your AI coding assistant (OpenCode, Antigravity, Claude Code, Cursor, Windsurf) the power to interact with, explore, test, and fix real web applications like a Senior QA Engineer.</b>
