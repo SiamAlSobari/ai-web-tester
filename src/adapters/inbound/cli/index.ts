@@ -14,7 +14,8 @@ const program = new Command();
 program
   .name('ai-test')
   .description('Autonomous AI Web Testing Engine & Multi-Agent Integration CLI')
-  .version('0.2.0');
+  .version('0.2.3');
+
 
 program
   .command('init')
