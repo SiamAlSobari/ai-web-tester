@@ -1,6 +1,6 @@
 {
   "name": "ai-web-tester",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Autonomous browser testing engine & MCP toolset for AI coding agents",
   "repository": {
     "type": "git",
