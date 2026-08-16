@@ -1,9 +1,13 @@
 name: Publish to NPM
 
 on:
+  push:
+    tags:
+      - 'v*'
   release:
-    types: [created]
+    types: [created, published]
   workflow_dispatch:
+
 
 jobs:
   build-and-publish:
