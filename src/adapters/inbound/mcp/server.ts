@@ -17,8 +17,9 @@ export function createMcpServer(sessionManager?: SessionManager): McpServer {
 
   const server = new McpServer({
     name: 'ai-browser-testing',
-    version: '0.2.0',
+    version: '0.2.3',
   });
+
 
   // Tool 1: browser_open
   server.tool(

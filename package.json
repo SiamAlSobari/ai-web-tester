@@ -1,6 +1,6 @@
 {
   "name": "ai-web-tester",
-  "version": "0.2.2",
+  "version": "0.2.3",
   "description": "Autonomous browser testing engine & MCP toolset for AI coding agents",
   "repository": {
     "type": "git",
@@ -52,7 +52,7 @@
   "license": "MIT",
   "dependencies": {
     "@axe-core/playwright": "^4.13.0",
-    "@modelcontextprotocol/sdk": "^1.4.1",
+    "@modelcontextprotocol/sdk": "^1.30.0",
     "commander": "^13.1.0",
     "handlebars": "^4.7.8",
     "playwright": "^1.49.1",
@@ -60,9 +60,9 @@
   },
   "devDependencies": {
     "@types/node": "^22.10.2",
-    "tsup": "^8.3.5",
+    "tsup": "^8.5.1",
     "typescript": "^5.7.2",
-    "vitest": "^3.0.0"
+    "vitest": "^4.1.10"
   },
   "engines": {
     "node": ">=20.0.0"
