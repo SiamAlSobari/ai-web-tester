@@ -28,7 +28,7 @@ program
       const installer = new AgentInstaller();
       const agents = options.agent as SupportedAgent[];
       const isGlobal = !options.local;
-      console.log(`⚙️  Mengonfigurasi ${agents.join(', ')} (Scope: ${isGlobal ? 'Global' : 'Local'})...`);
+      console.log(`⚙️  Configuring ${agents.join(', ')} (Scope: ${isGlobal ? 'Global' : 'Local'})...`);
       const result = await installer.installForAgents(agents, isGlobal);
       for (const s of result.installed) console.log(`✅ ${s}`);
       for (const e of result.errors) console.log(`⚠️ ${e}`);
@@ -48,7 +48,7 @@ program
       const installer = new AgentInstaller();
       const agents = options.agent as SupportedAgent[];
       const isGlobal = !options.local;
-      console.log(`🧹 Menghapus konfigurasi untuk ${agents.join(', ')} (Scope: ${isGlobal ? 'Global' : 'Local'})...`);
+      console.log(`🧹 Removing configurations for ${agents.join(', ')} (Scope: ${isGlobal ? 'Global' : 'Local'})...`);
       const result = await installer.uninstallForAgents(agents, isGlobal);
       for (const s of result.uninstalled) console.log(`✅ ${s}`);
       for (const e of result.errors) console.log(`⚠️ ${e}`);
@@ -56,6 +56,7 @@ program
       await AgentInstaller.promptInteractiveUninstall();
     }
   });
+
 
 program
   .command('open <url>')

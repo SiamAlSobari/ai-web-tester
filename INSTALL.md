@@ -56,17 +56,18 @@ The wizard will prompt you to select your AI coding agent and installation scope
 ```text
 🚀 AI Web Testing — Universal Agent Setup Wizard
 ==================================================
-Pilih AI Agent yang ingin dikonfigurasi:
+Select the AI Agent(s) you wish to configure:
   1. Antigravity (MCP Server & Global Skills)
   2. OpenCode (MCP Config & Global Skills)
   3. Claude Code / Claude Desktop (MCP Config & Skills)
   4. Cursor (MCP Config & Rules)
   5. Windsurf / Roo Code (MCP Config & Skills)
-  A. Semua Agent di atas (All)
+  A. All Agents (Default)
 
-Pilihan Anda [1-5 atau A] (Default: A): A
-Pasang ke Global System? [Y/n] (Default: Y): Y
+Your choice [1-5 or A] (Default: A): A
+Install to Global System Config? [Y/n] (Default: Y): Y
 ```
+
 
 ### Method 2: Target-Specific Agent CLI
 
@@ -228,14 +229,15 @@ Select the agent you want to clean up:
 ```text
 🗑️  AI Web Testing — Uninstaller Wizard
 ==========================================
-Pilih AI Agent yang ingin di-uninstall (Hapus MCP & Skills):
+Select the AI Agent(s) you wish to uninstall (Remove MCP & Skills):
   1. Antigravity
   2. OpenCode
   3. Claude Code / Claude Desktop
   4. Cursor
   5. Windsurf / Roo Code
-  A. Semua Agent di atas (All)
+  A. All Agents
 ```
+
 
 ### 2. Direct Uninstaller via Flags
 ```bash

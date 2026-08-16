@@ -19,20 +19,21 @@ description: Run automated browser test on a web application for specific featur
 
 # 🕵️ Senior QA Web Testing Skill (\`/web-test\`)
 
-Gunakan skill ini untuk menjalankan pengujian mendalam layaknya seorang Senior QA Engineer pada fitur web tertentu (Login, Register, Checkout, Contact Form, CRUD, dll.).
-Pengujian berjalan cepat dan ringan di background (headless). Screenshot bukti pengujian otomatis diambil hanya ketika terjadi error/kegagalan.
+Use this skill to perform deep, multi-scenario browser testing like a Senior QA Engineer on specific web features (Authentication, Registration, Checkout, Forms, CRUD, Navigation, etc.).
+Tests run fast and lightweight in the background (headless). Error screenshots and telemetry are captured automatically whenever an issue occurs.
 
-## Matriks Pengujian:
-1. Empty / Required Field Validation (Negative)
-2. Invalid Format & Boundary Limits (Negative)
-3. Wrong Credentials / Invalid State (Negative)
-4. Security & Special Characters (Edge Case)
-5. Happy Path (Positive)
+## Test Matrices:
+1. **Empty / Required Field Validation** (Negative Testing)
+2. **Invalid Format & Boundary Limits** (Negative Testing)
+3. **Wrong Credentials / Invalid State Handling** (Negative Testing)
+4. **Security & Special Characters / SQL Injection / XSS strings** (Edge Case Testing)
+5. **Happy Path** (Positive End-to-End Flow)
 
-## Alur Kerja:
-1. Buka URL target via MCP tool \`browser_open({ url })\` (berjalan ringan di background).
-2. Eksekusi aksi via \`browser_act({ action, ref, value })\`. Jika terjadi error, sistem otomatis mengambil screenshot bukti.
-3. Hasilkan dokumen laporan Markdown via \`browser_report({ title })\` di folder \`test-reports/\`.
+## Workflow:
+1. Open the target URL via MCP tool \`browser_open({ url })\` (runs lightweight in headless background).
+2. Inspect elements and interact via \`browser_act({ action, ref, value })\`.
+3. If errors or unexpected behaviors occur, visual screenshots and runtime logs are captured automatically.
+4. Compile a structured Markdown test report via \`browser_report({ title })\` in \`./test-reports/\`.
 `,
 
   'web-test-all': `---
@@ -42,12 +43,12 @@ description: Autonomous deep crawler and full-site browser testing across all li
 
 # 🌐 Autonomous Full-Site QA Crawler (\`/web-test-all\`)
 
-Gunakan skill ini untuk audit kualitas otonom menyeluruh pada seluruh website/aplikasi di background (headless).
+Use this skill for comprehensive autonomous quality auditing across the entire website or web application in the background (headless).
 
-## Metodologi Audit:
-1. Phase 1: Site Map & Route Discovery (semua link dan menu).
-2. Phase 2: Page-by-Page Audit (Console errors, broken links, form validations). Screenshot otomatis diambil saat halaman mengalami error.
-3. Phase 3: Generate Laporan Audit Markdown via \`browser_report({ title: "Full Site Quality Audit" })\`.
+## Audit Methodology:
+1. **Phase 1: Site Map & Route Discovery**: Crawls all internal links and navigation routes.
+2. **Phase 2: Page-by-Page Audit**: Detects console errors, 404 broken links, and validates form accessibility.
+3. **Phase 3: Generate Markdown Audit Report**: Compiles full sitemap tree and broken link reports via \`browser_report({ title: "Full Site Quality Audit" })\`.
 `,
 
   'web-test-fix': `---
@@ -57,15 +58,16 @@ description: Autonomous Test-Fix-Retest loop: test application, identify bugs an
 
 # 🔄 Autonomous QA Test-Fix-Retest Loop (\`/web-test-fix\`)
 
-Gunakan skill ini untuk siklus otonom: **Uji Browser di background $\\rightarrow$ Temukan Bug $\\rightarrow$ Edit & Perbaiki Kode Sumber $\\rightarrow$ Uji Ulang sampai Lulus**.
+Use this skill for autonomous remediation: **Test in Browser $\\rightarrow$ Identify Bug & Root Cause $\\rightarrow$ Edit & Fix Source Code $\\rightarrow$ Retest until 100% Passing**.
 
-## Langkah:
-1. Buka browser via \`browser_open\` dan temukan error/stack trace (screenshot error otomatis tersimpan).
-2. Buka dan perbaiki file kode sumber aplikasi.
-3. Buka kembali browser dan retest verifikasi perbaikan.
-4. Buat laporan perbandingan Before vs After via \`browser_report\`.
+## Workflow:
+1. Open the web app via \`browser_open\` and locate errors/exceptions in telemetry.
+2. Open and edit the corresponding project source code files to fix the issue.
+3. Retest and re-verify the fix in the browser.
+4. Generate a Before vs After verification report via \`browser_report\`.
 `,
 };
+
 
 export class AgentInstaller {
   private readonly projectRoot: string;
@@ -445,16 +447,16 @@ export class AgentInstaller {
 
     console.log('\n🚀 AI Web Testing — Universal Agent Setup Wizard');
     console.log('==================================================');
-    console.log('Pilih AI Agent yang ingin dikonfigurasi:');
+    console.log('Select the AI Agent(s) you wish to configure:');
     console.log('  1. Antigravity (MCP Server & Global Skills)');
     console.log('  2. OpenCode (MCP Config & Global Skills)');
     console.log('  3. Claude Code / Claude Desktop (MCP Config & Skills)');
     console.log('  4. Cursor (MCP Config & Rules)');
     console.log('  5. Windsurf / Roo Code (MCP Config & Skills)');
-    console.log('  A. Semua Agent di atas (All)');
+    console.log('  A. All Agents (Default)');
 
-    const answer = (await question('\nPilihan Anda [1-5 atau A] (Default: A): ')).trim().toLowerCase();
-    const scopeAnswer = (await question('Pasang ke Global System? [Y/n] (Default: Y): ')).trim().toLowerCase();
+    const answer = (await question('\nYour choice [1-5 or A] (Default: A): ')).trim().toLowerCase();
+    const scopeAnswer = (await question('Install to Global System Config? [Y/n] (Default: Y): ')).trim().toLowerCase();
     rl.close();
 
     const isGlobal = scopeAnswer !== 'n';
@@ -467,19 +469,19 @@ export class AgentInstaller {
     else if (answer === '5') selectedAgents = ['windsurf'];
     else selectedAgents = ['antigravity', 'opencode', 'claude', 'cursor', 'windsurf'];
 
-    console.log(`\n⚙️  Mengonfigurasi untuk: ${selectedAgents.join(', ')} (Scope: ${isGlobal ? 'Global' : 'Local Workspace'})...\n`);
+    console.log(`\n⚙️  Configuring for: ${selectedAgents.join(', ')} (Scope: ${isGlobal ? 'Global' : 'Local Workspace'})...\n`);
 
     const installer = new AgentInstaller();
     const result = await installer.installForAgents(selectedAgents, isGlobal);
 
     for (const s of result.installed) {
-      console.log(`✅ Berhasil dikonfigurasi: ${s}`);
+      console.log(`✅ Successfully configured: ${s}`);
     }
     for (const e of result.errors) {
-      console.log(`⚠️ Gagal: ${e}`);
+      console.log(`⚠️ Failed: ${e}`);
     }
 
-    console.log('\n🎉 Setup Selesai! AI Agent Anda siap digunakan untuk web testing.');
+    console.log('\n🎉 Setup Complete! Your AI Agent is ready for automated browser testing.');
   }
 
   static async promptInteractiveUninstall(): Promise<void> {
@@ -493,16 +495,16 @@ export class AgentInstaller {
 
     console.log('\n🗑️  AI Web Testing — Uninstaller Wizard');
     console.log('==========================================');
-    console.log('Pilih AI Agent yang ingin di-uninstall (Hapus MCP & Skills):');
+    console.log('Select the AI Agent(s) you wish to uninstall (Remove MCP & Skills):');
     console.log('  1. Antigravity');
     console.log('  2. OpenCode');
     console.log('  3. Claude Code / Claude Desktop');
     console.log('  4. Cursor');
     console.log('  5. Windsurf / Roo Code');
-    console.log('  A. Semua Agent di atas (All)');
+    console.log('  A. All Agents');
 
-    const answer = (await question('\nPilihan Anda [1-5 atau A] (Default: A): ')).trim().toLowerCase();
-    const scopeAnswer = (await question('Hapus dari Global System? [Y/n] (Default: Y): ')).trim().toLowerCase();
+    const answer = (await question('\nYour choice [1-5 or A] (Default: A): ')).trim().toLowerCase();
+    const scopeAnswer = (await question('Remove from Global System Config? [Y/n] (Default: Y): ')).trim().toLowerCase();
     rl.close();
 
     const isGlobal = scopeAnswer !== 'n';
@@ -515,18 +517,19 @@ export class AgentInstaller {
     else if (answer === '5') selectedAgents = ['windsurf'];
     else selectedAgents = ['antigravity', 'opencode', 'claude', 'cursor', 'windsurf'];
 
-    console.log(`\n🧹 Menghapus MCP & Skills untuk: ${selectedAgents.join(', ')}...\n`);
+    console.log(`\n🧹 Removing MCP & Skills for: ${selectedAgents.join(', ')}...\n`);
 
     const installer = new AgentInstaller();
     const result = await installer.uninstallForAgents(selectedAgents, isGlobal);
 
     for (const s of result.uninstalled) {
-      console.log(`✅ Berhasil dihapus: ${s}`);
+      console.log(`✅ Successfully removed: ${s}`);
     }
     for (const e of result.errors) {
-      console.log(`⚠️ Gagal: ${e}`);
+      console.log(`⚠️ Failed: ${e}`);
     }
 
-    console.log('\n✨ Uninstall Selesai. Sistem AI Agent Anda telah bersih.');
+    console.log('\n✨ Uninstall Complete. Your AI Agent environment has been cleanly restored.');
   }
 }
+
