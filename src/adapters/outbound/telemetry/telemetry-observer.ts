@@ -26,17 +26,35 @@ export class PlaywrightTelemetryObserver implements ITelemetryObserver {
     );
   };
 
-  private readonly onResponse = (res: Response) => {
+  private readonly onResponse = async (res: Response) => {
     const status = res.status();
     if (status >= 400) {
+      let bodyPreview: string | undefined;
+      try {
+        const text = await res.text();
+        if (text) {
+          bodyPreview = text.length > 500 ? text.substring(0, 500) + '... [truncated]' : text;
+        }
+      } catch {
+        // Body might be binary or already consumed
+      }
+
       this.issues.push(
-        Issue.create('NETWORK_FAILURE', `[HTTP ${status}] ${res.request().method()} ${res.url()}`, this.attachedPage?.url() ?? '', {
-          details: {
-            status,
-            statusText: res.statusText(),
-            headers: res.headers(),
-          },
-        })
+        Issue.create(
+          'NETWORK_FAILURE',
+          `[HTTP ${status} ${res.statusText() || 'Error'}] ${res.request().method()} ${res.url()}`,
+          this.attachedPage?.url() ?? '',
+          {
+            details: {
+              status,
+              statusText: res.statusText(),
+              method: res.request().method(),
+              url: res.url(),
+              resourceType: res.request().resourceType(),
+              responseBody: bodyPreview,
+            },
+          }
+        )
       );
     }
   };
@@ -45,9 +63,19 @@ export class PlaywrightTelemetryObserver implements ITelemetryObserver {
     const failure = req.failure();
     const errorText = failure?.errorText ?? 'Request failed';
     this.issues.push(
-      Issue.create('NETWORK_FAILURE', `[Network Failure] ${req.method()} ${req.url()} (${errorText})`, this.attachedPage?.url() ?? '', {
-        details: { failureText: errorText },
-      })
+      Issue.create(
+        'NETWORK_FAILURE',
+        `[Fetch / Network Failed] ${req.method()} ${req.url()} (${errorText})`,
+        this.attachedPage?.url() ?? '',
+        {
+          details: {
+            failureText: errorText,
+            method: req.method(),
+            url: req.url(),
+            resourceType: req.resourceType(),
+          },
+        }
+      )
     );
   };
 

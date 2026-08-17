@@ -11,6 +11,10 @@ export class StateExtractor {
   async extractCurrentState(): Promise<PageState> {
     const scan = await this.driver.scanInteractiveElements();
     const issues = this.telemetry.getIssues();
+    const performance =
+      typeof this.driver.getPerformanceMetrics === 'function'
+        ? await this.driver.getPerformanceMetrics().catch(() => undefined)
+        : undefined;
 
     return new PageState({
       url: scan.url,
@@ -20,6 +24,8 @@ export class StateExtractor {
       issues,
       timestamp: new Date().toISOString(),
       viewport: { width: 1280, height: 720 },
+      performance,
+      scrollInfo: scan.scrollInfo,
     });
   }
 }

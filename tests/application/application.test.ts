@@ -51,6 +51,30 @@ class MockBrowserDriver implements IBrowserDriver {
     };
   }
 
+  async getPerformanceMetrics() {
+    return {
+      loadDurationMs: 120,
+      domContentLoadedMs: 60,
+      ttfbMs: 20,
+      firstContentfulPaintMs: 80,
+      resourceCount: 4,
+      totalResourceSizeKb: 90,
+    };
+  }
+
+  async uploadFile(_ref: number, _filePaths: string[]): Promise<void> {}
+  async waitForDownload(_triggerFn: () => Promise<void>, _savePath?: string): Promise<string> {
+    return 'download.txt';
+  }
+  async saveStorageState(_filepath: string): Promise<string> {
+    return '{}';
+  }
+  async loadStorageState(_filepath: string): Promise<void> {}
+  getPages() {
+    return [{ index: 0, url: this.currentUrl, title: 'Mock Application', isActive: true }];
+  }
+  async switchPage(_index: number): Promise<void> {}
+
   async captureScreenshot(filepath: string): Promise<string> {
     return filepath;
   }

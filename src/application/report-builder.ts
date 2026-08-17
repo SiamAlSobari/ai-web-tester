@@ -25,7 +25,8 @@ export class ReportBuilder {
       session.issues,
       session.screenshotPaths,
       session.targetUrl,
-      session.startedAt
+      session.startedAt,
+      session.currentState?.performance
     );
 
     const { filepath, content } = await this.reporter.generate(report, options?.outputPath);

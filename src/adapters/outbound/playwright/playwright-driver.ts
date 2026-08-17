@@ -1,7 +1,7 @@
 import path from 'node:path';
 import fs from 'node:fs/promises';
 import { chromium, devices, type Browser, type BrowserContext, type Page, type Locator, type CDPSession } from 'playwright';
-import { IBrowserDriver, LaunchOptions, InteractiveScanResult } from '../../../domain/interfaces/browser-driver.interface.js';
+import { IBrowserDriver, LaunchOptions, InteractiveScanResult, PagePerformanceMetrics } from '../../../domain/interfaces/browser-driver.interface.js';
 import { ElementRef } from '../../../domain/value-objects/element-ref.vo.js';
 import { ElementNotFoundError, NavigationTimeoutError, ActionExecutionError } from '../../../shared/errors/domain-errors.js';
 import { ProcessGuard } from '../../../shared/guards/process-guard.js';
@@ -93,9 +93,18 @@ export class PlaywrightDriver implements IBrowserDriver {
     this.ensureReady();
     try {
       await this.page!.goto(url, {
-        waitUntil: 'domcontentloaded',
+        waitUntil: 'load',
         timeout: timeoutMs,
+      }).catch(async () => {
+        await this.page!.waitForLoadState('domcontentloaded', { timeout: 10000 }).catch(() => {});
       });
+
+      // Allow network requests and SPA component hydration to settle
+      await this.page!.waitForLoadState('networkidle', { timeout: 3000 }).catch(() => {});
+
+      // Short stabilization delay for DOM rendering
+      await this.page!.waitForTimeout(200);
+
       this.locatorCache.clear();
       this.elementRefCache.clear();
     } catch (err: unknown) {
@@ -106,6 +115,66 @@ export class PlaywrightDriver implements IBrowserDriver {
       throw new ActionExecutionError('navigate', errorMsg, { url });
     }
   }
+
+  async getPerformanceMetrics(): Promise<PagePerformanceMetrics> {
+    this.ensureReady();
+    try {
+      return await this.page!.evaluate(() => {
+        const navEntries = performance.getEntriesByType('navigation') as PerformanceNavigationTiming[];
+        const paintEntries = performance.getEntriesByType('paint') as PerformanceEntry[];
+        const resourceEntries = performance.getEntriesByType('resource') as PerformanceResourceTiming[];
+
+        let ttfbMs = 0;
+        let domContentLoadedMs = 0;
+        let loadDurationMs = 0;
+        let dnsMs = 0;
+        let connectMs = 0;
+
+        if (navEntries.length > 0 && navEntries[0]) {
+          const nav = navEntries[0];
+          dnsMs = Math.max(0, Math.round(nav.domainLookupEnd - nav.domainLookupStart));
+          connectMs = Math.max(0, Math.round(nav.connectEnd - nav.connectStart));
+          ttfbMs = Math.max(0, Math.round(nav.responseStart - nav.requestStart));
+          domContentLoadedMs = Math.max(0, Math.round(nav.domContentLoadedEventEnd - nav.startTime));
+          loadDurationMs = Math.max(0, Math.round(nav.loadEventEnd - nav.startTime));
+        } else if (performance.timing) {
+          const t = performance.timing;
+          const start = t.navigationStart;
+          dnsMs = Math.max(0, t.domainLookupEnd - t.domainLookupStart);
+          connectMs = Math.max(0, t.connectEnd - t.connectStart);
+          ttfbMs = Math.max(0, t.responseStart - t.requestStart);
+          domContentLoadedMs = Math.max(0, t.domContentLoadedEventEnd - start);
+          loadDurationMs = Math.max(0, t.loadEventEnd - start);
+        }
+
+        let fcpMs: number | undefined;
+        const fcp = paintEntries.find((p) => p.name === 'first-contentful-paint');
+        if (fcp) {
+          fcpMs = Math.round(fcp.startTime);
+        }
+
+        const resourceCount = resourceEntries.length;
+        let totalSize = 0;
+        for (const r of resourceEntries) {
+          totalSize += r.transferSize || 0;
+        }
+
+        return {
+          dnsMs,
+          connectMs,
+          ttfbMs,
+          domContentLoadedMs,
+          loadDurationMs: loadDurationMs > 0 ? loadDurationMs : domContentLoadedMs,
+          firstContentfulPaintMs: fcpMs,
+          resourceCount,
+          totalResourceSizeKb: Math.round(totalSize / 1024),
+        };
+      });
+    } catch {
+      return {};
+    }
+  }
+
 
   async scanInteractiveElements(): Promise<InteractiveScanResult> {
     this.ensureReady();
@@ -181,11 +250,31 @@ export class PlaywrightDriver implements IBrowserDriver {
       .map((el) => el.toPromptString())
       .join('\n');
 
+    const scrollInfo = await page
+      .evaluate(() => {
+        const scrollY = window.scrollY || window.pageYOffset || 0;
+        const scrollHeight = document.documentElement.scrollHeight || document.body.scrollHeight || 0;
+        const clientHeight = window.innerHeight || document.documentElement.clientHeight || 0;
+        const maxScroll = Math.max(0, scrollHeight - clientHeight);
+        const canScrollDown = scrollY < maxScroll - 10;
+        const scrollPercentage = maxScroll > 0 ? Math.round((scrollY / maxScroll) * 100) : 100;
+
+        return {
+          scrollY: Math.round(scrollY),
+          scrollHeight: Math.round(scrollHeight),
+          clientHeight: Math.round(clientHeight),
+          canScrollDown,
+          scrollPercentage,
+        };
+      })
+      .catch(() => undefined);
+
     return {
       url,
       title,
       ariaTreeSummary: ariaSummary,
       elements: new Map(this.elementRefCache),
+      scrollInfo,
     };
   }
 

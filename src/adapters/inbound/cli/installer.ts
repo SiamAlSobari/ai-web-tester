@@ -19,21 +19,34 @@ description: Run automated browser test on a web application for specific featur
 
 # 🕵️ Senior QA Web Testing Skill (\`/web-test\`)
 
-Use this skill to perform deep, multi-scenario browser testing like a Senior QA Engineer on specific web features (Authentication, Registration, Checkout, Forms, CRUD, Navigation, etc.).
-Tests run fast and lightweight in the background (headless). Error screenshots and telemetry are captured automatically whenever an issue occurs.
+Use this skill to perform deep, multi-scenario browser testing like a Senior QA Engineer on web applications (Authentication, Forms, Buttons, Checkout, Navigation, CRUD, etc.).
 
-## Test Matrices:
-1. **Empty / Required Field Validation** (Negative Testing)
-2. **Invalid Format & Boundary Limits** (Negative Testing)
-3. **Wrong Credentials / Invalid State Handling** (Negative Testing)
-4. **Security & Special Characters / SQL Injection / XSS strings** (Edge Case Testing)
-5. **Happy Path** (Positive End-to-End Flow)
+## 🛑 Critical Execution Rules (MUST FOLLOW):
+1. 📸 **STRICT ERROR-ONLY SCREENSHOT POLICY**:
+   - **DO NOT take screenshots on every passing step or normal interaction!**
+   - The testing engine already takes automatic screenshots whenever an action fails or a runtime issue is detected.
+   - Only call \`browser_screenshot\` if an explicit visual UI anomaly/bug is observed. Do not spam screenshots for normal actions.
+2. ⏳ **RENDER & HYDRATION STABILIZATION**:
+   - Always verify the page render duration and load performance returned in \`browser_open\`.
+   - Ensure the page and components are fully rendered and hydrated before interacting with interactive elements.
+3. 📜 **SCROLL & BELOW-THE-FOLD TESTING**:
+   - Always inspect \`📜 Page Scroll Position\` returned in the page state.
+   - If the page has content below the fold (\`[CAN SCROLL DOWN]\`), you MUST execute scroll actions (\`browser_act({ action: "scroll", value: "down" })\` or \`value: "bottom"\`) to discover, inspect, and test lazy-loaded elements, infinite scrolls, sticky action bars, and footer controls.
+4. 🎯 **EXHAUSTIVE BUTTON & INTERACTIVE ELEMENT AUDIT (100% Coverage)**:
+   - Identify and test **ALL** clickable buttons, navigation links, form inputs, toggles, dropdowns, and modals from start to finish (across all scrolled sections).
+   - Systematically execute both Negative testing (empty fields, format violations, boundary limits, invalid credentials) and Positive testing (Happy Path).
+5. 🚨 **DEEP ERROR & TELEMETRY HARVESTING**:
+   - Automatically track and inspect all **Console Errors** (\`console.error\`), **Fetch / XHR Network Failures** (HTTP 4xx/5xx, API error payloads), and **Uncaught JS Exceptions**.
+   - Ensure all detected anomalies are captured and included in the final report.
+6. 📊 **EXECUTIVE REPORT GENERATION**:
+   - Conclude every testing session by calling \`browser_report({ title: "..." })\` to produce an executive, structured Markdown report in \`./test-reports/\`.
 
 ## Workflow:
-1. Open the target URL via MCP tool \`browser_open({ url })\` (runs lightweight in headless background).
-2. Inspect elements and interact via \`browser_act({ action, ref, value })\`.
-3. If errors or unexpected behaviors occur, visual screenshots and runtime logs are captured automatically.
-4. Compile a structured Markdown test report via \`browser_report({ title })\` in \`./test-reports/\`.
+1. Open the target URL via MCP tool \`browser_open({ url, headless })\`. Default is headless; set \`headless: false\` if headed GUI is requested.
+2. Review interactive element IDs (\`[ref=N]\`) and page load/render performance.
+3. Systematically test all interactive buttons and inputs using \`browser_act({ action, ref, value })\`.
+4. Inspect returned state and telemetry after each action.
+5. Generate the final comprehensive report via \`browser_report({ title: "..." })\`.
 `,
 
   'web-test-all': `---
@@ -43,12 +56,19 @@ description: Autonomous deep crawler and full-site browser testing across all li
 
 # 🌐 Autonomous Full-Site QA Crawler (\`/web-test-all\`)
 
-Use this skill for comprehensive autonomous quality auditing across the entire website or web application in the background (headless).
+Use this skill for comprehensive autonomous quality auditing across the entire website or web application.
+
+## 🛑 Critical Execution Rules:
+1. 📸 **ERROR-ONLY SCREENSHOTS**: NEVER capture screenshots for passing pages. Only capture visual proof when a page error, broken link, or UI bug occurs.
+2. 🎯 **100% INTERACTIVE & LINK COVERAGE**: Discover and crawl all internal links, navigation routes, forms, and buttons across every discovered route.
+3. 🚨 **FULL ERROR TELEMETRY**: Capture console errors, failed fetch/API requests (HTTP 4xx/5xx), and uncaught exceptions across all crawled pages.
+4. ⏱️ **RENDER PERFORMANCE AUDIT**: Record render times and performance health across routes.
+5. 📊 **EXECUTIVE AUDIT REPORT**: Compile full sitemap tree, broken link table, and issue analysis via \`browser_report({ title: "Full Site Quality Audit" })\`.
 
 ## Audit Methodology:
-1. **Phase 1: Site Map & Route Discovery**: Crawls all internal links and navigation routes.
-2. **Phase 2: Page-by-Page Audit**: Detects console errors, 404 broken links, and validates form accessibility.
-3. **Phase 3: Generate Markdown Audit Report**: Compiles full sitemap tree and broken link reports via \`browser_report({ title: "Full Site Quality Audit" })\`.
+1. **Phase 1: Site Map & Route Discovery**: Crawl internal routes and navigation menus via \`browser_crawl({ startUrl })\`.
+2. **Phase 2: Page-by-Page Deep Audit**: Navigate each route, verify load performance, inspect console logs, and test interactive forms.
+3. **Phase 3: Generate Markdown Audit Report**: Compile structured audit report via \`browser_report\`.
 `,
 
   'web-test-fix': `---
@@ -61,10 +81,11 @@ description: Autonomous Test-Fix-Retest loop: test application, identify bugs an
 Use this skill for autonomous remediation: **Test in Browser $\\rightarrow$ Identify Bug & Root Cause $\\rightarrow$ Edit & Fix Source Code $\\rightarrow$ Retest until 100% Passing**.
 
 ## Workflow:
-1. Open the web app via \`browser_open\` and locate errors/exceptions in telemetry.
-2. Open and edit the corresponding project source code files to fix the issue.
-3. Retest and re-verify the fix in the browser.
-4. Generate a Before vs After verification report via \`browser_report\`.
+1. **Test in Browser**: Open the web app via \`browser_open\` and execute interactive test flows.
+2. **Harvest Errors & Telemetry**: Extract console.error logs, failed API fetch requests (4xx/5xx), or UI failures.
+3. **Root Cause Analysis & Code Fix**: Locate the corresponding source code in the project, edit and resolve the issue.
+4. **Retest & Verify**: Re-run the browser test to confirm the fix works and no regressions were introduced.
+5. **Generate Verification Report**: Produce a Before vs After verification report via \`browser_report\`.
 `,
 };
 

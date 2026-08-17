@@ -10,11 +10,31 @@ export interface LaunchOptions {
   recordTrace?: boolean;
 }
 
+export interface ScrollInfo {
+  scrollY: number;
+  scrollHeight: number;
+  clientHeight: number;
+  canScrollDown: boolean;
+  scrollPercentage: number;
+}
+
 export interface InteractiveScanResult {
   url: string;
   title: string;
   ariaTreeSummary: string;
   elements: Map<number, ElementRef>;
+  scrollInfo?: ScrollInfo;
+}
+
+export interface PagePerformanceMetrics {
+  dnsMs?: number;
+  connectMs?: number;
+  ttfbMs?: number;
+  domContentLoadedMs?: number;
+  loadDurationMs?: number;
+  firstContentfulPaintMs?: number;
+  resourceCount?: number;
+  totalResourceSizeKb?: number;
 }
 
 export interface IBrowserDriver {
@@ -33,10 +53,12 @@ export interface IBrowserDriver {
   getPages(): Array<{ index: number; url: string; title: string; isActive: boolean }>;
   switchPage(index: number): Promise<void>;
   scanInteractiveElements(): Promise<InteractiveScanResult>;
+  getPerformanceMetrics(): Promise<PagePerformanceMetrics>;
   captureScreenshot(filepath: string, fullPage?: boolean): Promise<string>;
   getUrl(): string;
   getTitle(): Promise<string>;
   close(): Promise<void>;
   isAlive(): boolean;
 }
+
 

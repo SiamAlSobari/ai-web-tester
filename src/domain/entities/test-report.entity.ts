@@ -1,5 +1,6 @@
 import { Action } from './action.entity.js';
 import { Issue } from './issue.entity.js';
+import { PagePerformanceMetrics } from '../interfaces/browser-driver.interface.js';
 
 export type ReportStatus = 'PASSED' | 'FAILED' | 'WARNING';
 
@@ -18,6 +19,7 @@ export interface TestReportProps {
   issues: Issue[];
   screenshots: string[];
   recommendations: string[];
+  performance?: PagePerformanceMetrics;
 }
 
 export class TestReport {
@@ -35,6 +37,7 @@ export class TestReport {
   readonly issues: Issue[];
   readonly screenshots: string[];
   readonly recommendations: string[];
+  readonly performance?: PagePerformanceMetrics;
 
   constructor(props: TestReportProps) {
     this.id = props.id;
@@ -51,9 +54,18 @@ export class TestReport {
     this.issues = props.issues;
     this.screenshots = props.screenshots;
     this.recommendations = props.recommendations;
+    this.performance = props.performance;
   }
 
-  static fromSession(title: string, actions: Action[], issues: Issue[], screenshots: string[], targetUrl: string, startedAt: string): TestReport {
+  static fromSession(
+    title: string,
+    actions: Action[],
+    issues: Issue[],
+    screenshots: string[],
+    targetUrl: string,
+    startedAt: string,
+    performance?: PagePerformanceMetrics
+  ): TestReport {
     const endedAt = new Date().toISOString();
     const durationMs = new Date(endedAt).getTime() - new Date(startedAt).getTime();
     const totalSteps = actions.length;
@@ -96,6 +108,7 @@ export class TestReport {
       issues,
       screenshots,
       recommendations,
+      performance,
     });
   }
 
@@ -111,6 +124,7 @@ export class TestReport {
       totalSteps: this.totalSteps,
       passedSteps: this.passedSteps,
       failedSteps: this.failedSteps,
+      performance: this.performance,
       actions: this.actions.map((a) => a.toJSON()),
       issues: this.issues.map((i) => i.toJSON()),
       screenshots: this.screenshots,
@@ -118,3 +132,4 @@ export class TestReport {
     };
   }
 }
+
