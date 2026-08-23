@@ -1,6 +1,6 @@
 {
   "name": "ai-web-tester",
-  "version": "0.2.4",
+  "version": "0.3.0",
   "description": "Autonomous browser testing engine & MCP toolset for AI coding agents",
   "repository": {
     "type": "git",
@@ -55,11 +55,17 @@
     "@modelcontextprotocol/sdk": "^1.30.0",
     "commander": "^13.1.0",
     "handlebars": "^4.7.8",
+    "js-yaml": "^5.3.0",
+    "pino": "^10.3.1",
+    "pixelmatch": "^7.2.0",
     "playwright": "^1.49.1",
+    "pngjs": "^7.0.0",
     "zod": "^3.24.1"
   },
   "devDependencies": {
+    "@types/js-yaml": "^4.0.9",
     "@types/node": "^22.10.2",
+    "@types/pngjs": "^6.0.5",
     "tsup": "^8.5.1",
     "typescript": "^5.7.2",
     "vitest": "^4.1.10"

@@ -3,6 +3,7 @@ import fs from 'node:fs/promises';
 import { IBrowserDriver } from '../domain/interfaces/browser-driver.interface.js';
 import { ITelemetryObserver } from '../domain/interfaces/telemetry-observer.interface.js';
 import { StateExtractor } from './state-extractor.js';
+import { AssertionEngine } from './assertion-engine.js';
 import { Session } from '../domain/entities/session.entity.js';
 import { Action, ActionType } from '../domain/entities/action.entity.js';
 import { PageState } from '../domain/entities/page-state.entity.js';
@@ -25,7 +26,8 @@ export class ActionExecutor {
   constructor(
     private readonly driver: IBrowserDriver,
     private readonly telemetry: ITelemetryObserver,
-    private readonly stateExtractor: StateExtractor
+    private readonly stateExtractor: StateExtractor,
+    private readonly assertionEngine?: AssertionEngine
   ) {}
 
   async execute(session: Session, params: ExecuteActionParams): Promise<ExecuteActionResult> {
@@ -57,7 +59,7 @@ export class ActionExecutor {
       session.recordIssue(issue);
     }
 
-    // Automatic screenshot capture ONLY when error/issue is detected
+    // Automatic screenshot + optional auto trace on error/issue (#8)
     if (action.status === 'FAILED' || newIssues.length > 0) {
       try {
         const artifactDir = path.resolve(process.cwd(), 'artifacts');
@@ -68,6 +70,11 @@ export class ActionExecutor {
         session.recordScreenshot(screenshotPath);
         if (action.status === 'FAILED') {
           action.screenshotPath = screenshotPath;
+        }
+        // Auto-save trace if tracing was enabled for debugging
+        if (this.driver.isTracingActive?.()) {
+          const tracePath = path.join(artifactDir, 'traces', `trace-step-${action.stepNumber}-${Date.now()}.zip`);
+          await this.driver.saveTrace?.(tracePath).catch(() => {});
         }
       } catch {
         // Suppress screenshot errors
@@ -98,15 +105,15 @@ export class ActionExecutor {
             return;
           case 'click':
             if (params.ref === undefined) throw new Error('Ref ID required for click action');
-            await this.driver.click(params.ref);
+            await this.selfHealing(() => this.driver.click(params.ref!), params.ref);
             return;
           case 'fill':
             if (params.ref === undefined) throw new Error('Ref ID required for fill action');
-            await this.driver.fill(params.ref, params.value ?? '');
+            await this.selfHealing(() => this.driver.fill(params.ref!, params.value ?? ''), params.ref);
             return;
           case 'hover':
             if (params.ref === undefined) throw new Error('Ref ID required for hover action');
-            await this.driver.hover(params.ref);
+            await this.selfHealing(() => this.driver.hover(params.ref!), params.ref);
             return;
           case 'press':
             if (!params.value) throw new Error('Key name required for press action');
@@ -114,7 +121,7 @@ export class ActionExecutor {
             return;
           case 'select':
             if (params.ref === undefined) throw new Error('Ref ID required for select action');
-            await this.driver.selectOption(params.ref, params.value ?? '');
+            await this.selfHealing(() => this.driver.selectOption(params.ref!, params.value ?? ''), params.ref);
             return;
           case 'scroll':
             await this.driver.scroll(params.value || 'down', params.ref);
@@ -147,7 +154,7 @@ export class ActionExecutor {
         }
       } catch (err) {
         lastError = err;
-        // Brief pause before retry in case of transient DOM animation/state change
+        // Self-healing already tried on final attempt; brief pause before retry
         if (attempt < maxRetries) {
           await new Promise((r) => setTimeout(r, 500));
         }
@@ -157,13 +164,57 @@ export class ActionExecutor {
     throw lastError;
   }
 
+  /**
+   * Feature #9: Self-Healing Locator.
+   * On failure, fall back to re-scanning the page and trying role/text/selector
+   * based resolution before giving up. This reduces flakiness after dynamic
+   * re-renders where the cached ref locator went stale.
+   */
+  private async selfHealing(primary: () => Promise<void>, ref: number): Promise<void> {
+    try {
+      await primary();
+      return;
+    } catch (primaryErr) {
+      const page = this.driver.getRawPage?.() as unknown;
+      if (page && typeof (page as { locator?: unknown }).locator === 'function') {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const elRef = (this.driver as any)['elementRefCache']?.get?.(ref) ?? null;
+        if (elRef) {
+          const selector = this.buildFallbackSelector(elRef);
+          if (selector) {
+            try {
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              const loc = (page as any).locator(selector).first();
+              await loc.scrollIntoViewIfNeeded({ timeout: 5000 }).catch(() => {});
+              if (primary === this.driver.click.bind(this.driver, ref)) {
+                await loc.click({ timeout: 5000 });
+                return;
+              }
+              // Generic retry of primary after re-scan (locators refreshed)
+              await primary();
+              return;
+            } catch {
+              // fall through to throw primary error
+            }
+          }
+        }
+      }
+      throw primaryErr;
+    }
+  }
+
+  private buildFallbackSelector(elRef: { role?: string; name?: string; tag?: string; type?: string }): string | null {
+    const name = elRef.name?.trim();
+    if (name && elRef.role) {
+      return `${elRef.role === 'button' || elRef.role === 'link' ? elRef.tag ?? elRef.role : elRef.role}:has-text("${name.slice(0, 40)}")`;
+    }
+    if (name) return `text="${name.slice(0, 40)}"`;
+    if (elRef.tag && elRef.type) return `${elRef.tag}[type="${elRef.type}"]`;
+    return null;
+  }
 
   private buildActionSummary(action: Action, state: PageState): string {
-    const lines = [
-      action.toSummaryString(),
-      '',
-      state.toLLMContext(),
-    ];
+    const lines = [action.toSummaryString(), '', state.toLLMContext()];
     return lines.join('\n');
   }
 }

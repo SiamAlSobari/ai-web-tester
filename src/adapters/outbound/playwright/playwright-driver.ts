@@ -1,10 +1,22 @@
 import path from 'node:path';
 import fs from 'node:fs/promises';
 import { chromium, devices, type Browser, type BrowserContext, type Page, type Locator, type CDPSession } from 'playwright';
-import { IBrowserDriver, LaunchOptions, InteractiveScanResult, PagePerformanceMetrics } from '../../../domain/interfaces/browser-driver.interface.js';
+import {
+  IBrowserDriver,
+  LaunchOptions,
+  InteractiveScanResult,
+  PagePerformanceMetrics,
+  MockRouteOptions,
+  CrawlPageData,
+} from '../../../domain/interfaces/browser-driver.interface.js';
+import { ITelemetryObserver } from '../../../domain/interfaces/telemetry-observer.interface.js';
+import { A11yAuditResult } from '../../../domain/entities/a11y.entity.js';
 import { ElementRef } from '../../../domain/value-objects/element-ref.vo.js';
 import { ElementNotFoundError, NavigationTimeoutError, ActionExecutionError } from '../../../shared/errors/domain-errors.js';
 import { ProcessGuard } from '../../../shared/guards/process-guard.js';
+import { A11yAuditor } from '../a11y/a11y-auditor.js';
+import { VisualDiffEngine } from '../visual-diff/visual-diff.js';
+import type { SecurityConfig } from '../../../shared/config/security.js';
 
 export class PlaywrightDriver implements IBrowserDriver {
   private browser: Browser | null = null;
@@ -12,7 +24,10 @@ export class PlaywrightDriver implements IBrowserDriver {
   private page: Page | null = null;
   private cdpSession: CDPSession | null = null;
   private unregisterGuard: (() => void) | null = null;
-  private isTracingActive = false;
+  private tracingActive = false;
+  private currentViewport: { width: number; height: number } | null = null;
+  private readonly a11yAuditor = new A11yAuditor();
+  private readonly visualDiff = new VisualDiffEngine();
 
 
   // In-memory mapping of active refId to Playwright Locator
@@ -47,9 +62,15 @@ export class PlaywrightDriver implements IBrowserDriver {
 
     this.context = await this.browser.newContext(contextOptions);
 
+    const deviceEntry = options?.device ? devices[options.device] : undefined;
+    const deviceViewport = deviceEntry?.viewport ? (deviceEntry.viewport as { width: number; height: number }) : undefined;
+    this.currentViewport = contextOptions.viewport
+      ? { width: (contextOptions.viewport as { width: number }).width, height: (contextOptions.viewport as { height: number }).height }
+      : (deviceViewport as { width: number; height: number } | undefined) ?? { width: 1280, height: 720 };
+
     if (options?.recordTrace) {
       await this.context.tracing.start({ screenshots: true, snapshots: true, sources: true });
-      this.isTracingActive = true;
+      this.tracingActive = true;
     }
 
     // Network Throttling simulation via CDP
@@ -443,11 +464,86 @@ export class PlaywrightDriver implements IBrowserDriver {
 
 
   async stopTracing(tracePath: string): Promise<void> {
-    if (this.context && this.isTracingActive) {
+    if (this.context && this.tracingActive) {
       await fs.mkdir(path.dirname(tracePath), { recursive: true });
       await this.context.tracing.stop({ path: tracePath });
-      this.isTracingActive = false;
+      this.tracingActive = false;
     }
+  }
+
+  // --- Hexagonal decoupling: advanced features via interface methods ---
+
+  attachTelemetry(observer: ITelemetryObserver): void {
+    if (this.page) {
+      observer.attach(this.page);
+    }
+  }
+
+  getRawPage(): unknown {
+    return this.page;
+  }
+
+  getViewport(): { width: number; height: number } | null {
+    if (this.page) {
+      const vp = this.page.viewportSize();
+      if (vp) return vp;
+    }
+    return this.currentViewport;
+  }
+
+  async routeMock(options: MockRouteOptions): Promise<void> {
+    this.ensureReady();
+    const status = options.status ?? 200;
+    const contentType = options.contentType ?? (typeof options.body === 'object' ? 'application/json' : 'text/plain');
+    const body = typeof options.body === 'object' ? JSON.stringify(options.body) : (options.body ?? '');
+    const methodFilter = options.method?.toUpperCase();
+
+    await this.page!.route(options.urlPattern, async (route) => {
+      const req = route.request();
+      if (methodFilter && req.method().toUpperCase() !== methodFilter) {
+        await route.fallback();
+        return;
+      }
+      await route.fulfill({ status, contentType, body });
+    });
+  }
+
+  async routeUnmock(urlPattern?: string): Promise<void> {
+    this.ensureReady();
+    if (urlPattern) {
+      await this.page!.unroute(urlPattern);
+    } else {
+      await this.page!.unrouteAll();
+    }
+  }
+
+  async auditA11y(): Promise<A11yAuditResult> {
+    this.ensureReady();
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+    return this.a11yAuditor.audit(this.page!);
+  }
+
+  async getCrawlData(): Promise<CrawlPageData> {
+    this.ensureReady();
+    return this.page!.evaluate(() => {
+      const anchors = Array.from(document.querySelectorAll<HTMLAnchorElement>('a[href]'));
+      const hrefs = anchors.map((a) => a.href).filter((h) => h.startsWith('http'));
+      const forms = document.querySelectorAll('form').length;
+      return { title: document.title, hrefs, forms };
+    });
+  }
+
+  async compareScreenshot(currentPath: string, baselinePath: string, threshold?: number): Promise<{ hasDiff: boolean; diffPercentage: number; message: string }> {
+    const result = await this.visualDiff.compareScreenshots(currentPath, baselinePath, threshold);
+    return { hasDiff: result.hasDiff, diffPercentage: result.diffPercentage, message: result.message };
+  }
+
+  isTracingActive(): boolean {
+    return this.tracingActive;
+  }
+
+  async saveTrace(tracePath: string): Promise<void> {
+    await this.stopTracing(tracePath);
   }
 
   private async applyNetworkProfile(profile: 'Fast 3G' | 'Slow 3G' | 'Offline'): Promise<void> {
@@ -494,6 +590,11 @@ export class PlaywrightDriver implements IBrowserDriver {
     } catch (err: unknown) {
       throw new ActionExecutionError('screenshot', err instanceof Error ? err.message : String(err), { filepath });
     }
+  }
+
+  setSecurityConfig(_config?: SecurityConfig): void {
+    // PlaywrightDriver may optionally enforce host whitelist via launch navigation guard.
+    // Currently enforced at SessionManager level; kept for interface symmetry.
   }
 
   getUrl(): string {

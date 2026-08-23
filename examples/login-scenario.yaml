@@ -1,0 +1,24 @@
+name: "Login Flow (Data-Driven)"
+baseUrl: "http://localhost:3000/login"
+headless: true
+device: "iPhone 15"
+
+# Feature #14: Data-Driven — iterate steps over each row, {{email}}/{{password}} substituted
+data:
+  - email: "admin@test.com"
+    password: "admin123"
+  - email: "user@test.com"
+    password: "user123"
+
+steps:
+  - navigate: "http://localhost:3000/login"
+  - fill: { ref: 1, value: "{{email}}" }      # email field
+  - fill: { ref: 2, value: "{{password}}" }  # password field
+  - click: 3                                   # sign-in button
+  - wait: 1000
+  # Feature #1: Assertion
+  - assert: { ref: 4, kind: "visible", expected: "Dashboard" }
+  - assert: { ref: 4, kind: "text", expected: "Dashboard", operator: "contains" }
+  # Feature #15: Performance budget
+  - assertPerf: { metric: "fcp", thresholdMs: 1500, operator: "lte" }
+  - screenshot: "login-result"

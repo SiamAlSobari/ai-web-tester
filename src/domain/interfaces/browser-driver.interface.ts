@@ -1,4 +1,6 @@
 import { ElementRef } from '../value-objects/element-ref.vo.js';
+import { ITelemetryObserver } from './telemetry-observer.interface.js';
+import { A11yAuditResult } from '../entities/a11y.entity.js';
 
 export interface LaunchOptions {
   headless?: boolean;
@@ -8,6 +10,20 @@ export interface LaunchOptions {
   device?: string;
   networkProfile?: 'None' | 'Fast 3G' | 'Slow 3G' | 'Offline';
   recordTrace?: boolean;
+}
+
+export interface CrawlPageData {
+  title: string;
+  hrefs: string[];
+  forms: number;
+}
+
+export interface MockRouteOptions {
+  urlPattern: string;
+  status?: number;
+  body?: string | Record<string, unknown>;
+  contentType?: string;
+  method?: string;
 }
 
 export interface ScrollInfo {
@@ -59,6 +75,18 @@ export interface IBrowserDriver {
   getTitle(): Promise<string>;
   close(): Promise<void>;
   isAlive(): boolean;
+
+  // Hexagonal decoupling — telemetry & advanced features via interface, no instanceof needed
+  attachTelemetry?(observer: ITelemetryObserver): Promise<void> | void;
+  getRawPage?(): unknown;
+  getViewport?(): { width: number; height: number } | null;
+  routeMock?(options: MockRouteOptions): Promise<void>;
+  routeUnmock?(urlPattern?: string): Promise<void>;
+  auditA11y?(): Promise<A11yAuditResult>;
+  getCrawlData?(): Promise<CrawlPageData>;
+  compareScreenshot?(currentPath: string, baselinePath: string, threshold?: number): Promise<{ hasDiff: boolean; diffPercentage: number; message: string }>;
+  isTracingActive?(): boolean;
+  saveTrace?(tracePath: string): Promise<void>;
 }
 
 

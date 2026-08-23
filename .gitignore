@@ -8,3 +8,7 @@ artifacts/
 *.log
 .npmrc
 .env
+
+# test artifacts
+__nonexistent_baseline_*.png
+diff-*.png

@@ -28,35 +28,57 @@ export class PlaywrightTelemetryObserver implements ITelemetryObserver {
 
   private readonly onResponse = async (res: Response) => {
     const status = res.status();
-    if (status >= 400) {
-      let bodyPreview: string | undefined;
-      try {
-        const text = await res.text();
-        if (text) {
-          bodyPreview = text.length > 500 ? text.substring(0, 500) + '... [truncated]' : text;
-        }
-      } catch {
-        // Body might be binary or already consumed
-      }
+    const resourceType = res.request().resourceType();
+    const url = res.url();
+    const lowerUrl = url.toLowerCase();
 
-      this.issues.push(
-        Issue.create(
-          'NETWORK_FAILURE',
-          `[HTTP ${status} ${res.statusText() || 'Error'}] ${res.request().method()} ${res.url()}`,
-          this.attachedPage?.url() ?? '',
-          {
-            details: {
-              status,
-              statusText: res.statusText(),
-              method: res.request().method(),
-              url: res.url(),
-              resourceType: res.request().resourceType(),
-              responseBody: bodyPreview,
-            },
-          }
-        )
-      );
+    // Feature #8: Filter telemetry noise — only capture meaningful failures.
+    const isNoise =
+      status < 400 ||
+      (status === 404 && (lowerUrl.includes('favicon') || /\.(png|jpe?g|gif|webp|svg|css|woff2?|ttf|ico)(\?|$)/.test(lowerUrl))) ||
+      lowerUrl.includes('analytics') ||
+      lowerUrl.includes('gtag') ||
+      lowerUrl.includes('facebook') ||
+      lowerUrl.includes('doubleclick') ||
+      lowerUrl.includes('googleadservices') ||
+      (resourceType !== 'document' && resourceType !== 'xhr' && resourceType !== 'fetch' && status < 500);
+
+    if (isNoise) return;
+
+    // Deduplicate identical failures within the last 5 seconds
+    const now = Date.now();
+    const dup = this.issues.find(
+      (i) => i.type === 'NETWORK_FAILURE' && i.details?.['url'] === url && now - new Date(i.timestamp).getTime() < 5000
+    );
+    if (dup) return;
+
+    let bodyPreview: string | undefined;
+    try {
+      const text = await res.text();
+      if (text) {
+        bodyPreview = text.length > 500 ? text.substring(0, 500) + '... [truncated]' : text;
+      }
+    } catch {
+      // Body might be binary or already consumed
     }
+
+    this.issues.push(
+      Issue.create(
+        'NETWORK_FAILURE',
+        `[HTTP ${status} ${res.statusText() || 'Error'}] ${res.request().method()} ${url}`,
+        this.attachedPage?.url() ?? '',
+        {
+          details: {
+            status,
+            statusText: res.statusText(),
+            method: res.request().method(),
+            url,
+            resourceType,
+            responseBody: bodyPreview,
+          },
+        }
+      )
+    );
   };
 
   private readonly onRequestFailed = (req: Request) => {

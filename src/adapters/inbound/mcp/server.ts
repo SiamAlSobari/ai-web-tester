@@ -4,40 +4,44 @@ import { z } from 'zod';
 import { SessionManager } from '../../../application/session-manager.js';
 import { PlaywrightDriver } from '../../outbound/playwright/playwright-driver.js';
 import { PlaywrightTelemetryObserver } from '../../outbound/telemetry/telemetry-observer.js';
-import { MarkdownReporter } from '../../outbound/reporter/markdown-reporter.js';
+import { MarkdownReporter, HtmlReporter, JUnitReporter } from '../../outbound/reporter/index.js';
 import { SitemapCrawler } from '../../../application/crawler/sitemap-crawler.js';
+import { ScenarioRunner } from '../../../application/scenario-runner/scenario-runner.js';
 import { A11yAuditor } from '../../outbound/a11y/a11y-auditor.js';
+import { publishLiveEvent } from '../../../shared/events/live-bus.js';
+import { assertUrlAllowed, type SecurityConfig } from '../../../shared/config/security.js';
 
-export function createMcpServer(sessionManager?: SessionManager): McpServer {
+export function createMcpServer(sessionManager?: SessionManager, securityConfig?: SecurityConfig): McpServer {
   const driver = new PlaywrightDriver();
   const telemetry = new PlaywrightTelemetryObserver();
   const reporter = new MarkdownReporter();
   const manager = sessionManager ?? new SessionManager(driver, telemetry, reporter);
+  if (securityConfig) manager.setSecurityConfig(securityConfig);
   const a11yAuditor = new A11yAuditor();
+  const scenarioRunner = new ScenarioRunner(manager);
 
   const server = new McpServer({
     name: 'ai-browser-testing',
-    version: '0.2.4',
+    version: '0.3.0',
   });
 
-
-  // Tool 1: browser_open
   server.tool(
     'browser_open',
-    'Opens target URL in browser, extracts interactive elements with ref IDs, and returns initial state.',
+    'Opens target URL in browser, returns sessionId + interactive elements.',
     {
       url: z.string().url().describe('The URL to open and test (e.g. http://localhost:3000)'),
-      headless: z.boolean().optional().default(true).describe('Run browser in headless background mode (default true for lightweight execution)'),
-      width: z.number().optional().default(1280).describe('Browser viewport width'),
-      height: z.number().optional().default(720).describe('Browser viewport height'),
-      device: z.string().optional().describe('Mobile device preset to emulate (e.g. "iPhone 15", "Pixel 7", "iPad Pro 11")'),
-      storageState: z.string().optional().describe('Path to saved auth state JSON file (cookies/localStorage)'),
-      networkProfile: z.enum(['None', 'Fast 3G', 'Slow 3G', 'Offline']).optional().default('None').describe('Network throttling profile'),
-      recordTrace: z.boolean().optional().default(false).describe('Record full Playwright trace (.zip) for deep debugging'),
+      headless: z.boolean().optional().default(true),
+      width: z.number().optional().default(1280),
+      height: z.number().optional().default(720),
+      device: z.string().optional(),
+      storageState: z.string().optional(),
+      networkProfile: z.enum(['None', 'Fast 3G', 'Slow 3G', 'Offline']).optional().default('None'),
+      recordTrace: z.boolean().optional().default(false),
+      sessionId: z.string().optional().describe('Custom session id for multi-session parallel testing'),
     },
-    async ({ url, headless, width, height, device, storageState, networkProfile, recordTrace }) => {
+    async ({ url, headless, width, height, device, storageState, networkProfile, recordTrace, sessionId }) => {
       try {
-        const { state } = await manager.startSession({
+        const { sessionId: sid, state } = await manager.startSession({
           url,
           headless,
           viewport: { width, height },
@@ -45,294 +49,339 @@ export function createMcpServer(sessionManager?: SessionManager): McpServer {
           storageState,
           networkProfile,
           recordTrace,
+          sessionId,
         });
-
-        return {
-          content: [
-            {
-              type: 'text',
-              text: `✅ Successfully opened ${url}\n\n${state.toLLMContext()}`,
-            },
-          ],
-        };
+        return { content: [{ type: 'text', text: `✅ Opened ${url} [session: ${sid}]\n\n${state.toLLMContext()}` }] };
       } catch (err: unknown) {
-        const errorMsg = err instanceof Error ? err.message : String(err);
-        return {
-          isError: true,
-          content: [{ type: 'text', text: `❌ Failed to open URL: ${errorMsg}` }],
-        };
+        return { isError: true, content: [{ type: 'text', text: `❌ Failed: ${err instanceof Error ? err.message : String(err)}` }] };
       }
     }
   );
 
-  // Tool 2: browser_act
   server.tool(
     'browser_act',
-    'Executes an interaction on a referenced element (click, fill, hover, press, select, scroll, upload, download, switch_tab, screenshot).',
+    'Executes an interaction on a referenced element.',
     {
-      action: z
-        .enum(['click', 'fill', 'hover', 'press', 'select', 'scroll', 'upload', 'download', 'switch_tab', 'screenshot'])
-        .describe('Action type to execute'),
-      ref: z.number().optional().describe('Element ref ID to interact with, or element to scroll into view / upload to / download from'),
-      value: z.string().optional().describe('Value to fill, key to press, option to select, download save path, or scroll direction ("down", "up", "bottom", "top")'),
-      filePaths: z.array(z.string()).optional().describe('Array of absolute file paths if action is upload'),
-      screenshotName: z.string().optional().describe('Custom name if action is screenshot'),
+      action: z.enum(['click', 'fill', 'hover', 'press', 'select', 'scroll', 'upload', 'download', 'switch_tab', 'screenshot']),
+      ref: z.number().optional(),
+      value: z.string().optional(),
+      filePaths: z.array(z.string()).optional(),
+      screenshotName: z.string().optional(),
+      sessionId: z.string().optional(),
     },
-    async ({ action, ref, value, filePaths, screenshotName }) => {
+    async ({ action, ref, value, filePaths, screenshotName, sessionId }) => {
       try {
-        const result = await manager.executeAction({
-          type: action,
-          ref,
-          value,
-          filePaths,
-          screenshotName,
-        });
-
-        return {
-          content: [
-            {
-              type: 'text',
-              text: result.llmSummary,
-            },
-          ],
-        };
+        const result = await manager.executeAction({ type: action, ref, value, filePaths, screenshotName }, sessionId);
+        return { content: [{ type: 'text', text: result.llmSummary }] };
       } catch (err: unknown) {
-        const errorMsg = err instanceof Error ? err.message : String(err);
-        return {
-          isError: true,
-          content: [{ type: 'text', text: `❌ Action failed: ${errorMsg}` }],
-        };
+        return { isError: true, content: [{ type: 'text', text: `❌ Action failed: ${err instanceof Error ? err.message : String(err)}` }] };
       }
     }
   );
 
-  // Tool 3: browser_inspect
+  server.tool(
+    'browser_assert',
+    'Feature #1: Asserts page state — visibility, text, value, count, checked, etc.',
+    {
+      kind: z.enum(['visible', 'hidden', 'exists', 'text', 'value', 'contains', 'enabled', 'disabled', 'checked', 'count']),
+      ref: z.number().optional(),
+      expected: z.union([z.string(), z.number(), z.boolean()]).optional(),
+      operator: z.enum(['equals', 'contains', 'gte', 'lte', 'gt', 'lt', 'regex']).optional().default('equals'),
+      sessionId: z.string().optional(),
+    },
+    async ({ kind, ref, expected, operator, sessionId }) => {
+      try {
+        const { sessionId: sid, result } = await manager.assert({ kind, ref, expected, operator, sessionId });
+        return {
+          content: [
+            {
+              type: 'text',
+              text: `${result.passed ? '✅ Assertion PASSED' : '❌ Assertion FAILED'}: ${result.message} [session: ${sid}]`,
+            },
+          ],
+        };
+      } catch (err: unknown) {
+        return { isError: true, content: [{ type: 'text', text: `❌ Assert failed: ${err instanceof Error ? err.message : String(err)}` }] };
+      }
+    }
+  );
+
+  server.tool(
+    'browser_assert_perf',
+    'Feature #15: Asserts Web Vitals performance budget (FCP/Load/TTFB/DCL).',
+    {
+      metric: z.enum(['fcp', 'load', 'ttfb', 'domContentLoaded', 'dcl']),
+      thresholdMs: z.number(),
+      operator: z.enum(['lte', 'lt', 'gte', 'gt', 'equals']).optional().default('lte'),
+      sessionId: z.string().optional(),
+    },
+    async ({ metric, thresholdMs, operator, sessionId }) => {
+      try {
+        const { result } = await manager.assertPerformance(metric, thresholdMs, operator, sessionId);
+        return {
+          content: [{ type: 'text', text: `${result.passed ? '✅ Perf OK' : '❌ Perf Budget Violated'}: ${result.message}` }],
+        };
+      } catch (err: unknown) {
+        return { isError: true, content: [{ type: 'text', text: `❌ ${err instanceof Error ? err.message : String(err)}` }] };
+      }
+    }
+  );
+
   server.tool(
     'browser_inspect',
-    'Inspects current page state, refreshed interactive element refs, and all captured console/network errors.',
-    {},
-    async () => {
+    'Refreshes interactive element refs and all captured console/network errors.',
+    { sessionId: z.string().optional() },
+    async ({ sessionId }) => {
       try {
-        const result = await manager.inspect();
-        return {
-          content: [
-            {
-              type: 'text',
-              text: result.llmContext,
-            },
-          ],
-        };
+        const result = await manager.inspect(sessionId);
+        return { content: [{ type: 'text', text: result.llmContext }] };
       } catch (err: unknown) {
-        const errorMsg = err instanceof Error ? err.message : String(err);
-        return {
-          isError: true,
-          content: [{ type: 'text', text: `❌ Inspection failed: ${errorMsg}` }],
-        };
+        return { isError: true, content: [{ type: 'text', text: `❌ Inspection failed: ${err instanceof Error ? err.message : String(err)}` }] };
       }
     }
   );
 
-  // Tool 4: browser_screenshot
   server.tool(
     'browser_screenshot',
-    'Takes a screenshot of the current page and saves it to artifacts directory.',
+    'Takes a screenshot; supports visual regression compare against a baseline.',
     {
-      name: z.string().optional().describe('Screenshot filename (e.g. login-error)'),
-      fullPage: z.boolean().optional().default(false).describe('Capture full scrollable page'),
+      name: z.string().optional(),
+      fullPage: z.boolean().optional().default(false),
+      compareBaseline: z.string().optional().describe('Path to baseline PNG for visual regression'),
+      threshold: z.number().optional().default(0.1),
+      sessionId: z.string().optional(),
     },
-    async ({ name, fullPage }) => {
+    async ({ name, fullPage, compareBaseline, threshold, sessionId }) => {
       try {
-        const { filepath } = await manager.takeScreenshot(name, fullPage);
-        return {
-          content: [
-            {
-              type: 'text',
-              text: `📸 Screenshot saved successfully to: ${filepath}`,
-            },
-          ],
-        };
+        const { filepath } = await manager.takeScreenshot(name, fullPage, sessionId);
+        let diffMsg = '';
+        if (compareBaseline) {
+          const diff = await driver.compareScreenshot(filepath, compareBaseline, threshold);
+          diffMsg = `\n\n🔍 Visual Regression: ${diff.message} (diff ${diff.diffPercentage}%)`;
+        }
+        return { content: [{ type: 'text', text: `📸 Screenshot saved: ${filepath}${diffMsg}` }] };
       } catch (err: unknown) {
-        const errorMsg = err instanceof Error ? err.message : String(err);
-        return {
-          isError: true,
-          content: [{ type: 'text', text: `❌ Failed to capture screenshot: ${errorMsg}` }],
-        };
+        return { isError: true, content: [{ type: 'text', text: `❌ ${err instanceof Error ? err.message : String(err)}` }] };
       }
     }
   );
 
-  // Tool 5: browser_switch_tab
   server.tool(
     'browser_switch_tab',
-    'Lists open tabs or switches active browser tab/popup by index.',
-    {
-      tabIndex: z.number().optional().describe('Zero-based index of the tab to activate. If omitted, returns list of open tabs.'),
-    },
-    async ({ tabIndex }) => {
+    'Lists open tabs or switches active tab by index.',
+    { tabIndex: z.number().optional(), sessionId: z.string().optional() },
+    async ({ tabIndex, sessionId }) => {
       try {
         if (tabIndex === undefined) {
           const tabs = manager.getTabs();
           const tabList = tabs.map((t) => `[Tab ${t.index}] ${t.isActive ? '👉 (Active)' : ''} URL: ${t.url}`).join('\n');
-          return {
-            content: [{ type: 'text', text: `📑 Open Tabs (${tabs.length}):\n\n${tabList}` }],
-          };
+          return { content: [{ type: 'text', text: `📑 Open Tabs (${tabs.length}):\n\n${tabList}` }] };
         }
-
-        const result = await manager.switchTab(tabIndex);
-        return {
-          content: [
-            {
-              type: 'text',
-              text: `🔄 Switched to Tab ${tabIndex}\n\n${result.llmContext}`,
-            },
-          ],
-        };
+        const result = await manager.switchTab(tabIndex, sessionId);
+        return { content: [{ type: 'text', text: `🔄 Switched to Tab ${tabIndex}\n\n${result.llmContext}` }] };
       } catch (err: unknown) {
-        const errorMsg = err instanceof Error ? err.message : String(err);
-        return {
-          isError: true,
-          content: [{ type: 'text', text: `❌ Failed to switch tab: ${errorMsg}` }],
-        };
+        return { isError: true, content: [{ type: 'text', text: `❌ ${err instanceof Error ? err.message : String(err)}` }] };
       }
     }
   );
 
-  // Tool 6: browser_save_auth
   server.tool(
     'browser_save_auth',
-    'Saves current browser session cookies and localStorage to a JSON file for re-use in future tests.',
-    {
-      path: z.string().optional().describe('Custom file path to save auth JSON (defaults to ./artifacts/auth/auth-[timestamp].json)'),
-    },
-    async ({ path: customPath }) => {
+    'Saves cookies/localStorage to JSON for reuse.',
+    { path: z.string().optional(), sessionId: z.string().optional() },
+    async ({ path: customPath, sessionId }) => {
       try {
-        const result = await manager.saveAuthState(customPath);
-        return {
-          content: [
-            {
-              type: 'text',
-              text: `💾 Auth state saved successfully to: ${result.filepath}\nUse this path in future browser_open calls via storageState parameter.`,
-            },
-          ],
-        };
+        const result = await manager.saveAuthState(customPath, sessionId);
+        return { content: [{ type: 'text', text: `💾 Auth saved: ${result.filepath}` }] };
       } catch (err: unknown) {
-        const errorMsg = err instanceof Error ? err.message : String(err);
-        return {
-          isError: true,
-          content: [{ type: 'text', text: `❌ Failed to save auth state: ${errorMsg}` }],
-        };
+        return { isError: true, content: [{ type: 'text', text: `❌ ${err instanceof Error ? err.message : String(err)}` }] };
       }
     }
   );
 
-  // Tool 7: browser_audit_a11y
+  server.tool(
+    'browser_mock',
+    'Feature #10: Mocks a network route (simulate 500/401 error states without backend changes).',
+    {
+      urlPattern: z.string(),
+      status: z.number().optional().default(200),
+      body: z.union([z.string(), z.record(z.unknown())]).optional(),
+      contentType: z.string().optional(),
+      sessionId: z.string().optional(),
+    },
+    async ({ urlPattern, status, body, contentType, sessionId }) => {
+      try {
+        await driver.routeMock({ urlPattern, status, body, contentType });
+        return { content: [{ type: 'text', text: `🎭 Mocked ${urlPattern} -> ${status}` }] };
+      } catch (err: unknown) {
+        return { isError: true, content: [{ type: 'text', text: `❌ ${err instanceof Error ? err.message : String(err)}` }] };
+      }
+    }
+  );
+
+  server.tool(
+    'browser_mock_reset',
+    'Removes network mocks (all or a specific pattern).',
+    { urlPattern: z.string().optional(), sessionId: z.string().optional() },
+    async ({ urlPattern }) => {
+      try {
+        await driver.routeUnmock(urlPattern);
+        return { content: [{ type: 'text', text: `🧹 Mocks cleared${urlPattern ? ` for ${urlPattern}` : ''}` }] };
+      } catch (err: unknown) {
+        return { isError: true, content: [{ type: 'text', text: `❌ ${err instanceof Error ? err.message : String(err)}` }] };
+      }
+    }
+  );
+
   server.tool(
     'browser_audit_a11y',
-    'Runs automated WCAG 2.1 AA accessibility audit on the active page via axe-core.',
-    {},
+    'Runs automated WCAG 2.1 AA accessibility audit on the active page.',
+    { sessionId: z.string().optional() },
     async () => {
       try {
-        const activeDriver = (manager as unknown as { driver: PlaywrightDriver }).driver;
-        const page = activeDriver?.getPage();
-        if (!page) {
-          throw new Error('No active page to audit.');
-        }
-
-        const result = await a11yAuditor.audit(page);
+        const page = driver.getRawPage() as unknown;
+        if (!page) throw new Error('No active page.');
+        const result = await driver.auditA11y();
         const markdown = a11yAuditor.toMarkdownSummary(result);
-        return {
-          content: [{ type: 'text', text: markdown }],
-        };
+        return { content: [{ type: 'text', text: markdown }] };
       } catch (err: unknown) {
-        const errorMsg = err instanceof Error ? err.message : String(err);
-        return {
-          isError: true,
-          content: [{ type: 'text', text: `❌ A11y audit failed: ${errorMsg}` }],
-        };
+        return { isError: true, content: [{ type: 'text', text: `❌ A11y audit failed: ${err instanceof Error ? err.message : String(err)}` }] };
       }
     }
   );
 
-  // Tool 8: browser_crawl
   server.tool(
     'browser_crawl',
-    'Autonomously explores internal website routes, builds sitemap hierarchy tree, and detects 404/broken links.',
+    'Autonomously crawls internal routes, builds sitemap, detects broken links (real HTTP status).',
     {
-      url: z.string().url().describe('The root URL to start crawling from'),
-      maxDepth: z.number().optional().default(3).describe('Maximum crawl depth (default 3)'),
-      maxPages: z.number().optional().default(20).describe('Maximum pages to visit (default 20)'),
+      url: z.string().url(),
+      maxDepth: z.number().optional().default(3),
+      maxPages: z.number().optional().default(20),
     },
     async ({ url, maxDepth, maxPages }) => {
       try {
         const crawlDriver = new PlaywrightDriver();
-        const crawler = new SitemapCrawler(crawlDriver);
+        const crawler = new SitemapCrawler(crawlDriver, telemetry);
         const result = await crawler.crawl(url, { maxDepth, maxPages });
         const markdown = crawler.toMarkdownReport(result);
         await crawlDriver.close();
-        return {
-          content: [{ type: 'text', text: markdown }],
-        };
+        return { content: [{ type: 'text', text: markdown }] };
       } catch (err: unknown) {
-        const errorMsg = err instanceof Error ? err.message : String(err);
-        return {
-          isError: true,
-          content: [{ type: 'text', text: `❌ Crawl failed: ${errorMsg}` }],
-        };
+        return { isError: true, content: [{ type: 'text', text: `❌ Crawl failed: ${err instanceof Error ? err.message : String(err)}` }] };
       }
     }
   );
 
-  // Tool 9: browser_report
   server.tool(
     'browser_report',
-    'Compiles all test steps, captured console errors, failed assertions, and screenshots into a Markdown (.md) test report file.',
+    'Compiles all steps, assertions, console errors into a Markdown report.',
     {
-      title: z.string().optional().describe('Title of the test report (e.g. Authentication Flow Test)'),
-      outputPath: z.string().optional().describe('Custom file path to save the .md report'),
+      title: z.string().optional(),
+      outputPath: z.string().optional(),
+      sessionId: z.string().optional(),
     },
-    async ({ title, outputPath }) => {
+    async ({ title, outputPath, sessionId }) => {
       try {
-        const result = await manager.generateReport({ title, outputPath });
+        const result = await manager.generateReport({ title, outputPath }, sessionId);
+        publishLiveEvent('report:generated', { path: result.filepath, status: result.report.status });
         return {
           content: [
             {
               type: 'text',
-              text: `📄 Test Report generated successfully!\n\n**File Location:** \`${result.filepath}\`\n**Status:** ${result.report.status}\n**Total Steps:** ${result.report.totalSteps} (Passed: ${result.report.passedSteps}, Failed: ${result.report.failedSteps})\n**Issues Found:** ${result.report.issues.length}\n\n---\n\n${result.content}`,
+              text: `📄 Report: ${result.filepath}\nStatus: ${result.report.status}\nSteps: ${result.report.totalSteps} (Passed: ${result.report.passedSteps}, Failed: ${result.report.failedSteps})\nIssues: ${result.report.issues.length}`,
             },
           ],
         };
       } catch (err: unknown) {
-        const errorMsg = err instanceof Error ? err.message : String(err);
-        return {
-          isError: true,
-          content: [{ type: 'text', text: `❌ Failed to generate report: ${errorMsg}` }],
-        };
+        return { isError: true, content: [{ type: 'text', text: `❌ ${err instanceof Error ? err.message : String(err)}` }] };
       }
     }
   );
 
-  // Tool 10: browser_close
   server.tool(
-    'browser_close',
-    'Closes current active browser testing session and releases system resources.',
+    'browser_report_junit',
+    'Feature #11: Generates JUnit XML report for CI/CD (GitHub Actions annotations).',
+    {
+      outputPath: z.string().optional(),
+      sessionId: z.string().optional(),
+    },
+    async ({ outputPath, sessionId }) => {
+      try {
+        const junit = new JUnitReporter();
+        const result = await manager.generateReport({ outputPath }, sessionId);
+        const { filepath } = await junit.generate(result.report, outputPath ?? undefined);
+        return { content: [{ type: 'text', text: `🧪 JUnit report: ${filepath}` }] };
+      } catch (err: unknown) {
+        return { isError: true, content: [{ type: 'text', text: `❌ ${err instanceof Error ? err.message : String(err)}` }] };
+      }
+    }
+  );
+
+  server.tool(
+    'browser_report_html',
+    'Feature #11: Generates interactive HTML report.',
+    {
+      outputPath: z.string().optional(),
+      sessionId: z.string().optional(),
+    },
+    async ({ outputPath, sessionId }) => {
+      try {
+        const html = new HtmlReporter();
+        const result = await manager.generateReport({ outputPath }, sessionId);
+        const { filepath } = await html.generate(result.report, outputPath ?? undefined);
+        return { content: [{ type: 'text', text: `🌐 HTML report: ${filepath}` }] };
+      } catch (err: unknown) {
+        return { isError: true, content: [{ type: 'text', text: `❌ ${err instanceof Error ? err.message : String(err)}` }] };
+      }
+    }
+  );
+
+  server.tool(
+    'browser_run_scenario',
+    'Feature #4 + #14: Runs a YAML scenario file (data-driven via `data:` rows).',
+    { path: z.string() },
+    async ({ path: scenarioPath }) => {
+      try {
+        const result = await scenarioRunner.runFromYaml(scenarioPath);
+        return {
+          content: [
+            {
+              type: 'text',
+              text: `${result.passed ? '✅ Scenario PASSED' : '❌ Scenario FAILED'}: ${result.name}\nSteps: ${result.stepsExecuted}\nFailures: ${result.failures.join('\n') || 'none'}`,
+            },
+          ],
+        };
+      } catch (err: unknown) {
+        return { isError: true, content: [{ type: 'text', text: `❌ ${err instanceof Error ? err.message : String(err)}` }] };
+      }
+    }
+  );
+
+  server.tool(
+    'browser_sessions',
+    'Lists all active multi-sessions.',
     {},
     async () => {
       try {
-        await manager.closeSession();
-        return {
-          content: [
-            {
-              type: 'text',
-              text: '🔒 Browser session closed and resources cleaned up.',
-            },
-          ],
-        };
+        const sessions = manager.listSessions();
+        const text = sessions.length === 0 ? 'No active sessions.' : sessions.map((s) => `[${s.id}] ${s.url} (${s.status}, ${s.actions} actions, ${s.issues} issues)`).join('\n');
+        return { content: [{ type: 'text', text: `📚 Active Sessions:\n${text}` }] };
       } catch (err: unknown) {
-        const errorMsg = err instanceof Error ? err.message : String(err);
-        return {
-          isError: true,
-          content: [{ type: 'text', text: `❌ Failed to close session: ${errorMsg}` }],
-        };
+        return { isError: true, content: [{ type: 'text', text: `❌ ${err instanceof Error ? err.message : String(err)}` }] };
+      }
+    }
+  );
+
+  server.tool(
+    'browser_close',
+    'Closes browser session and releases resources.',
+    { sessionId: z.string().optional() },
+    async ({ sessionId }) => {
+      try {
+        await manager.closeSession(sessionId);
+        return { content: [{ type: 'text', text: '🔒 Session closed & cleaned up.' }] };
+      } catch (err: unknown) {
+        return { isError: true, content: [{ type: 'text', text: `❌ ${err instanceof Error ? err.message : String(err)}` }] };
       }
     }
   );
@@ -340,8 +389,8 @@ export function createMcpServer(sessionManager?: SessionManager): McpServer {
   return server;
 }
 
-export async function runMcpServer(sessionManager?: SessionManager): Promise<void> {
-  const server = createMcpServer(sessionManager);
+export async function runMcpServer(sessionManager?: SessionManager, securityConfig?: SecurityConfig): Promise<void> {
+  const server = createMcpServer(sessionManager, securityConfig);
   const transport = new StdioServerTransport();
   await server.connect(transport);
 }

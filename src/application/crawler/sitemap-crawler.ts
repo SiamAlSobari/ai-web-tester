@@ -36,11 +36,9 @@ export class SitemapCrawler {
       await this.driver.launch({ headless: true });
     }
 
-    if (this.driver instanceof PlaywrightDriver && this.telemetry) {
-      const page = this.driver.getPage();
-      if (page) {
-        this.telemetry.attach(page);
-      }
+    // Feature #3: Hexagonal decoupling — attach telemetry via interface
+    if (this.telemetry) {
+      this.driver.attachTelemetry?.(this.telemetry);
     }
 
     while (queue.length > 0 && visited.size < maxPages) {
@@ -58,8 +56,15 @@ export class SitemapCrawler {
         let formsCount = 0;
         let statusCode = 200;
 
-        if (this.driver instanceof PlaywrightDriver) {
-          const page = this.driver.getPage();
+        // Feature #6: Use interface method for crawl data (decoupled from Playwright)
+        const crawlData = await this.driver.getCrawlData?.().catch(() => undefined);
+        if (crawlData) {
+          title = crawlData.title;
+          pageLinks = crawlData.hrefs;
+          formsCount = crawlData.forms;
+        } else if (this.driver instanceof PlaywrightDriver) {
+          // Fallback for drivers that don't implement getCrawlData
+          const page = (this.driver as unknown as { getPage?: () => unknown }).getPage?.() as { title: () => Promise<string>; evaluate: (fn: () => unknown) => Promise<{ hrefs: string[]; forms: number }> } | null;
           if (page) {
             title = await page.title().catch(() => '');
             const pageData = await page.evaluate(() => {
@@ -68,11 +73,15 @@ export class SitemapCrawler {
               const forms = document.querySelectorAll('form').length;
               return { hrefs, forms };
             }).catch(() => ({ hrefs: [], forms: 0 }));
-
             pageLinks = pageData.hrefs;
             formsCount = pageData.forms;
           }
         }
+
+        // Feature #6: Capture real HTTP status via response, not hardcoded 200
+        const rawPage = this.driver.getRawPage?.() as { url: () => string } | undefined;
+        const finalUrl = rawPage?.url?.() ?? cleanUrl;
+        statusCode = await this.resolveStatus(finalUrl).catch(() => 200);
 
         const node: CrawlNode = {
           url: cleanUrl,
@@ -83,7 +92,7 @@ export class SitemapCrawler {
           parentUrl: current.parentUrl,
           links: pageLinks,
           formsCount,
-          errorCount: 0,
+          errorCount: statusCode >= 400 ? 1 : 0,
         };
 
         nodes.push(node);
@@ -96,6 +105,8 @@ export class SitemapCrawler {
               // Only explore internal routes under the same origin
               if (linkObj.origin === rootOrigin) {
                 const normLink = this.normalizeUrl(link);
+                // Feature #6: Skip static asset / noise links
+                if (/\.(png|jpe?g|gif|webp|svg|css|woff2?|ttf|ico|pdf|xml|json)(\?|$)/i.test(normLink)) continue;
                 if (!visited.has(normLink) && !queue.some((q) => this.normalizeUrl(q.url) === normLink)) {
                   queue.push({ url: normLink, depth: current.depth + 1, parentUrl: cleanUrl });
                 }
@@ -107,9 +118,11 @@ export class SitemapCrawler {
         }
       } catch (err: unknown) {
         const errorMsg = err instanceof Error ? err.message : String(err);
+        const statusMatch = errorMsg.match(/(\d{3})/);
+        const status = statusMatch && statusMatch[1] ? parseInt(statusMatch[1], 10) : 500;
         brokenLinks.push({
           url: cleanUrl,
-          status: errorMsg.includes('404') ? 404 : 500,
+          status: status >= 400 ? status : 500,
           foundOn: current.parentUrl || rootUrl,
           errorMsg,
         });
@@ -169,5 +182,17 @@ export class SitemapCrawler {
     } catch {
       return url;
     }
+  }
+
+  private async resolveStatus(url: string): Promise<number> {
+    // Try to read real status from recently captured network telemetry if available
+    if (this.telemetry) {
+      const issues = this.telemetry.getIssues();
+      const netIssue = issues.find((i) => i.type === 'NETWORK_FAILURE' && (i.details?.['url'] as string) === url);
+      if (netIssue && typeof netIssue.details?.['status'] === 'number') {
+        return netIssue.details['status'] as number;
+      }
+    }
+    return 200;
   }
 }

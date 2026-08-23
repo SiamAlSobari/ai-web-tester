@@ -1,6 +1,7 @@
 import http from 'node:http';
 import fs from 'node:fs/promises';
 import path from 'node:path';
+import { subscribe } from '../../../shared/events/live-bus.js';
 
 export interface DashboardServerOptions {
   port?: number;
@@ -34,13 +35,28 @@ export class DashboardServer {
         return;
       }
 
+      // Feature #12: SSE live event stream
+      if (pathname === '/api/events') {
+        res.writeHead(200, {
+          'Content-Type': 'text/event-stream',
+          'Cache-Control': 'no-cache',
+          Connection: 'keep-alive',
+        });
+        const send = (event: { type: string; payload: unknown; timestamp: string }) => {
+          res.write(`data: ${JSON.stringify(event)}\n\n`);
+        };
+        const unsub = subscribe(send);
+        req.on('close', () => unsub());
+        return;
+      }
+
       // API: List test reports
       if (pathname === '/api/reports') {
         try {
           const files = await fs.readdir(reportsDir);
           const reports = [];
           for (const file of files) {
-            if (file.endsWith('.md')) {
+            if (file.endsWith('.md') || file.endsWith('.html') || file.endsWith('.xml')) {
               const content = await fs.readFile(path.join(reportsDir, file), 'utf-8');
               reports.push({
                 filename: file,

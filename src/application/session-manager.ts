@@ -5,80 +5,138 @@ import { ITelemetryObserver } from '../domain/interfaces/telemetry-observer.inte
 import { IReporter } from '../domain/interfaces/reporter.interface.js';
 import { Session } from '../domain/entities/session.entity.js';
 import { PageState } from '../domain/entities/page-state.entity.js';
+import { Issue } from '../domain/entities/issue.entity.js';
 import { StateExtractor } from './state-extractor.js';
 import { ActionExecutor, ExecuteActionParams, ExecuteActionResult } from './action-executor.js';
 import { ReportBuilder, BuildReportOptions, BuildReportResult } from './report-builder.js';
+import { AssertionEngine, AssertionParams, AssertionResult, PerfMetric } from './assertion-engine.js';
 import { SessionNotInitializedError } from '../shared/errors/domain-errors.js';
-import { PlaywrightDriver } from '../adapters/outbound/playwright/playwright-driver.js';
+import { assertUrlAllowed, type SecurityConfig } from '../shared/config/security.js';
+import { publishLiveEvent } from '../shared/events/live-bus.js';
 
 export interface StartSessionOptions extends LaunchOptions {
   url: string;
+  sessionId?: string;
+}
+
+export interface AssertParams extends AssertionParams {
+  sessionId?: string;
+}
+
+export interface SessionSummary {
+  id: string;
+  url: string;
+  status: string;
+  actions: number;
+  issues: number;
 }
 
 export class SessionManager {
-  private activeSession: Session | null = null;
-  private readonly stateExtractor: StateExtractor;
-  private readonly actionExecutor: ActionExecutor;
-  private readonly reportBuilder: ReportBuilder;
+  private readonly sessions: Map<string, Session> = new Map();
+  private readonly stateExtractors: Map<string, StateExtractor> = new Map();
+  private readonly actionExecutors: Map<string, ActionExecutor> = new Map();
+  private activeSessionId: string | null = null;
+  private readonly assertionEngine: AssertionEngine;
+  private securityConfig?: SecurityConfig;
 
   constructor(
     private readonly driver: IBrowserDriver,
     private readonly telemetry: ITelemetryObserver,
     private readonly reporter: IReporter
   ) {
-    this.stateExtractor = new StateExtractor(this.driver, this.telemetry);
-    this.actionExecutor = new ActionExecutor(this.driver, this.telemetry, this.stateExtractor);
-    this.reportBuilder = new ReportBuilder(this.reporter);
+    this.assertionEngine = new AssertionEngine(this.driver);
   }
 
-  async startSession(options: StartSessionOptions): Promise<{ session: Session; state: PageState }> {
-    // If active session exists, close it first
-    if (this.activeSession) {
-      await this.closeSession();
-    }
+  setSecurityConfig(config?: SecurityConfig): void {
+    this.securityConfig = config;
+  }
+
+  async startSession(options: StartSessionOptions): Promise<{ sessionId: string; session: Session; state: PageState }> {
+    assertUrlAllowed(options.url, this.securityConfig);
 
     this.telemetry.clear();
     await this.driver.launch(options);
 
-    // Attach telemetry listener to page if driver is PlaywrightDriver
-    if (this.driver instanceof PlaywrightDriver) {
-      const page = this.driver.getPage();
-      if (page) {
-        this.telemetry.attach(page);
-      }
-    }
+    // Hexagonal decoupling: attach telemetry via interface (no instanceof needed)
+    this.driver.attachTelemetry?.(this.telemetry);
 
     const session = Session.create(options.url);
-    this.activeSession = session;
+    const sessionId = options.sessionId || session.id;
+    this.sessions.set(sessionId, session);
+    this.activeSessionId = sessionId;
+    publishLiveEvent('session:start', { sessionId, url: options.url });
 
-    // Navigate to initial target URL
+    const viewport = this.driver.getViewport?.() ?? undefined;
+    const stateExtractor = new StateExtractor(this.driver, this.telemetry, viewport);
+    this.stateExtractors.set(sessionId, stateExtractor);
+    this.actionExecutors.set(
+      sessionId,
+      new ActionExecutor(this.driver, this.telemetry, stateExtractor, this.assertionEngine)
+    );
+
     await this.driver.navigate(options.url);
-
-    // Extract initial state
-    const initialState = await this.stateExtractor.extractCurrentState();
+    const initialState = await stateExtractor.extractCurrentState();
     session.updateState(initialState);
 
-    return { session, state: initialState };
+    return { sessionId, session, state: initialState };
   }
 
-  async executeAction(params: ExecuteActionParams): Promise<ExecuteActionResult> {
-    const session = this.ensureActiveSession();
-    return this.actionExecutor.execute(session, params);
+  private getSession(sessionId?: string): Session {
+    const id = sessionId || this.activeSessionId;
+    if (!id) throw new SessionNotInitializedError();
+    const session = this.sessions.get(id);
+    if (!session || session.status === 'CLOSED') throw new SessionNotInitializedError();
+    return session;
   }
 
-  async inspect(): Promise<{ session: Session; state: PageState; llmContext: string }> {
-    const session = this.ensureActiveSession();
-    const state = await this.stateExtractor.extractCurrentState();
+  private getExecutor(sessionId?: string): ActionExecutor {
+    const id = sessionId || this.activeSessionId;
+    const ex = id ? this.actionExecutors.get(id) : undefined;
+    if (!ex) throw new SessionNotInitializedError();
+    return ex;
+  }
+
+  async executeAction(params: ExecuteActionParams, sessionId?: string): Promise<ExecuteActionResult> {
+    const sid = sessionId || this.activeSessionId || undefined;
+    const session = this.getSession(sid);
+    const result = await this.getExecutor(sid).execute(session, params);
+    publishLiveEvent('action:executed', { sessionId: sid, action: result.action.toJSON() });
+    return result;
+  }
+
+  async assert(params: AssertParams): Promise<{ sessionId: string; result: AssertionResult }> {
+    const session = this.getSession(params.sessionId);
+    const result = await this.assertionEngine.assert(session, params);
+    if (!result.passed) {
+      session.recordIssue(this.assertionEngine.createIssueForFailure(session, params.kind, result));
+    }
+    publishLiveEvent('assertion:result', { sessionId: params.sessionId || this.activeSessionId, passed: result.passed, message: result.message });
+    return { sessionId: (params.sessionId || this.activeSessionId)!, result };
+  }
+
+  async assertPerformance(metric: PerfMetric, thresholdMs: number, operator: 'lte' | 'lt' | 'gte' | 'gt' | 'equals' = 'lte', sessionId?: string) {
+    const session = this.getSession(sessionId);
+    const result = await this.assertionEngine.assertPerformance(session, metric, thresholdMs, operator);
+    if (!result.passed) {
+      session.recordIssue(
+        Issue.create('ASSERTION_FAILURE', `[Perf Budget] ${result.message}`, session.targetUrl, {
+          details: { metric, thresholdMs, actualMs: result.actualMs },
+        })
+      );
+    }
+    return { sessionId: (sessionId || this.activeSessionId)!, result };
+  }
+
+  async inspect(sessionId?: string): Promise<{ sessionId: string; session: Session; state: PageState; llmContext: string }> {
+    const session = this.getSession(sessionId);
+    const stateExtractor = this.stateExtractors.get(sessionId || this.activeSessionId!)!;
+    const state = await stateExtractor.extractCurrentState();
     session.updateState(state);
-    return {
-      session,
-      state,
-      llmContext: state.toLLMContext(),
-    };
+    return { sessionId: (sessionId || this.activeSessionId)!, session, state, llmContext: state.toLLMContext() };
   }
 
-  async saveAuthState(customPath?: string): Promise<{ filepath: string }> {
-    this.ensureActiveSession();
+  async saveAuthState(customPath?: string, sessionId?: string): Promise<{ filepath: string }> {
+    this.getSession(sessionId);
     const artifactDir = path.resolve(process.cwd(), 'artifacts', 'auth');
     await fs.mkdir(artifactDir, { recursive: true });
     const targetFile = customPath || path.join(artifactDir, `auth-${Date.now()}.json`);
@@ -87,78 +145,89 @@ export class SessionManager {
   }
 
   getTabs(): Array<{ index: number; url: string; title: string; isActive: boolean }> {
-    this.ensureActiveSession();
     return this.driver.getPages();
   }
 
-  async switchTab(tabIndex: number): Promise<{ session: Session; state: PageState; llmContext: string }> {
-    const session = this.ensureActiveSession();
+  async switchTab(tabIndex: number, sessionId?: string): Promise<{ sessionId: string; session: Session; state: PageState; llmContext: string }> {
+    const session = this.getSession(sessionId);
     await this.driver.switchPage(tabIndex);
-
-    // Re-attach telemetry to the newly active page if driver is PlaywrightDriver
-    if (this.driver instanceof PlaywrightDriver) {
-      const page = this.driver.getPage();
-      if (page) {
-        this.telemetry.attach(page);
-      }
-    }
-
-    const state = await this.stateExtractor.extractCurrentState();
+    this.driver.attachTelemetry?.(this.telemetry);
+    const stateExtractor = this.stateExtractors.get(sessionId || this.activeSessionId!)!;
+    const state = await stateExtractor.extractCurrentState();
     session.updateState(state);
-    return {
-      session,
-      state,
-      llmContext: state.toLLMContext(),
-    };
+    return { sessionId: (sessionId || this.activeSessionId)!, session, state, llmContext: state.toLLMContext() };
   }
 
-  async saveTrace(customPath?: string): Promise<{ filepath: string }> {
-    this.ensureActiveSession();
+  async saveTrace(customPath?: string, sessionId?: string): Promise<{ filepath: string }> {
+    this.getSession(sessionId);
     const traceDir = path.resolve(process.cwd(), 'artifacts', 'traces');
     await fs.mkdir(traceDir, { recursive: true });
     const targetFile = customPath || path.join(traceDir, `trace-${Date.now()}.zip`);
-    if (this.driver instanceof PlaywrightDriver) {
-      await this.driver.stopTracing(targetFile);
+    if (this.driver.isTracingActive?.()) {
+      await this.driver.saveTrace?.(targetFile);
     }
     return { filepath: targetFile };
   }
 
-  async takeScreenshot(name?: string, fullPage = false): Promise<{ filepath: string }> {
-
-    const session = this.ensureActiveSession();
+  async takeScreenshot(name?: string, fullPage = false, sessionId?: string): Promise<{ filepath: string }> {
+    const session = this.getSession(sessionId);
     const artifactName = name ? (name.endsWith('.png') ? name : `${name}.png`) : `screenshot-${Date.now()}.png`;
     const artifactDir = path.resolve(process.cwd(), 'artifacts');
     await fs.mkdir(artifactDir, { recursive: true });
     const filepath = path.join(artifactDir, artifactName);
-
     await this.driver.captureScreenshot(filepath, fullPage);
     session.recordScreenshot(filepath);
-
     return { filepath };
   }
 
-  async generateReport(options?: BuildReportOptions): Promise<BuildReportResult> {
-    const session = this.ensureActiveSession();
-    return this.reportBuilder.buildFromSession(session, options);
+  async generateReport(options?: BuildReportOptions, sessionId?: string): Promise<BuildReportResult> {
+    const session = this.getSession(sessionId);
+    const reportBuilder = new ReportBuilder(this.reporter);
+    return reportBuilder.buildFromSession(session, options);
   }
 
-  async closeSession(): Promise<void> {
-    if (this.activeSession) {
-      this.activeSession.close();
-      this.activeSession = null;
+  listSessions(): SessionSummary[] {
+    return Array.from(this.sessions.values()).map((s) => ({
+      id: s.id,
+      url: s.targetUrl,
+      status: s.status,
+      actions: s.actions.length,
+      issues: s.issues.length,
+    }));
+  }
+
+  async closeSession(sessionId?: string): Promise<void> {
+    const id = sessionId || this.activeSessionId;
+    if (!id) return;
+    publishLiveEvent('session:close', { sessionId: id });
+    const session = this.sessions.get(id);
+    if (session) {
+      session.close();
+      this.sessions.delete(id);
+      this.stateExtractors.delete(id);
+      this.actionExecutors.delete(id);
     }
-    this.telemetry.detach();
-    await this.driver.close();
-  }
-
-  getActiveSession(): Session | null {
-    return this.activeSession;
-  }
-
-  private ensureActiveSession(): Session {
-    if (!this.activeSession || this.activeSession.status === 'CLOSED') {
-      throw new SessionNotInitializedError();
+    if (this.activeSessionId === id) {
+      const remaining = Array.from(this.sessions.keys());
+      this.activeSessionId = remaining.length > 0 ? remaining[remaining.length - 1]! : null;
     }
-    return this.activeSession;
+    if (this.sessions.size === 0) {
+      this.telemetry.detach();
+      await this.driver.close();
+    }
+  }
+
+  async closeAll(): Promise<void> {
+    for (const id of Array.from(this.sessions.keys())) {
+      await this.closeSession(id);
+    }
+  }
+
+  getActiveSession(sessionId?: string): Session | null {
+    try {
+      return this.getSession(sessionId);
+    } catch {
+      return null;
+    }
   }
 }
