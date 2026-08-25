@@ -1,0 +1,13 @@
+---
+title: Mobile & Network
+description: Presets and throttling.
+---
+
+Devices via `playwright.devices`: `iPhone 15`, `Pixel 7`, `iPad Pro 11`.
+
+Network via CDP `Network.emulateNetworkConditions`: `Fast 3G`, `Slow 3G`, `Offline` (100% offline).
+
+```bash
+ai-test open http://localhost:3000 -d "iPhone 15"
+ai-test open http://example.com --browser webkit
+```

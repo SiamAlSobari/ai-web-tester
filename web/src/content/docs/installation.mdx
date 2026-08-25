@@ -1,0 +1,59 @@
+---
+title: Installation
+description: Full install matrix for every agent.
+---
+
+import { Tabs, TabItem } from '@astrojs/starlight/components';
+
+Requires **Node ≥20**.
+
+```bash
+npm install
+npx playwright install chromium
+npm run build
+npm test
+npm run typecheck
+```
+
+## Agent setup
+
+<Tabs>
+  <TabItem label="OpenCode">
+  ```bash
+  node dist/cli.js init -a opencode
+  # writes ~/.config/opencode/config.json + skills
+  ```
+  </TabItem>
+  <TabItem label="Antigravity">
+  ```bash
+  node dist/cli.js init -a antigravity
+  # writes ~/.gemini/config/mcp_config.json
+  ```
+  </TabItem>
+  <TabItem label="Claude">
+  ```bash
+  node dist/cli.js init -a claude
+  # writes claude_desktop_config.json
+  ```
+  </TabItem>
+  <TabItem label="Cursor">
+  ```bash
+  node dist/cli.js init -a cursor
+  # writes ~/.cursor/mcp.json + rules
+  ```
+  </TabItem>
+  <TabItem label="Windsurf">
+  ```bash
+  node dist/cli.js init -a windsurf
+  ```
+  </TabItem>
+</Tabs>
+
+Uninstall: `node dist/cli.js uninstall -a opencode` or interactive `init`/`uninstall` without flags.
+
+## Verify
+
+```bash
+node dist/cli.js --help
+node dist/cli.js open http://example.com
+```

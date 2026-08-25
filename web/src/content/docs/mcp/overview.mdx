@@ -1,0 +1,27 @@
+---
+title: MCP Overview
+description: 17 tools over stdio.
+---
+
+Transport `stdio` via `dist/mcp.js`. Security: `allowedHosts` + `blockPrivateNetwork`.
+
+| Tool | Params | Desc |
+|---|---|---|
+| browser_open | url, headless, device, browser, storageState, networkProfile, recordTrace/Video/Har | Launch + ARIA |
+| browser_act | action, ref, value, filePaths | Interaction with retry + self-healing |
+| browser_inspect | — | Refresh state |
+| browser_switch_tab | tabIndex | Multi-tab |
+| browser_save_auth | path | JSON cookies |
+| browser_audit_a11y | — | axe-core |
+| browser_crawl | url, maxDepth, maxPages | Sitemap |
+| browser_screenshot | name, fullPage, compareBaseline, threshold | + visual diff |
+| browser_report | title, outputPath | Markdown |
+| browser_report_junit/html | outputPath | CI |
+| browser_run_scenario | path | YAML |
+| browser_sessions | — | List |
+| browser_assert | kind, ref, expected, operator | 10 kinds |
+| browser_assert_perf | metric, thresholdMs, operator | Web Vitals |
+| browser_mock / mock_reset | urlPattern, status, body | Route mocking |
+| browser_health | — | alive/version/pages |
+| browser_wait_for / extract / live_screenshot | — | Ergonomics |
+| browser_close | sessionId | Teardown |

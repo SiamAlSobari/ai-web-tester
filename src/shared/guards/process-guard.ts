@@ -28,6 +28,19 @@ export class ProcessGuard {
       });
     }
 
+    process.once('uncaughtException', async (err) => {
+      console.error('Uncaught exception — cleaning up browser:', err);
+      await this.runAllCleanups();
+      if (process.env['VITEST'] || process.env['NODE_ENV'] === 'test') return;
+      process.exit(1);
+    });
+    process.once('unhandledRejection', async (reason) => {
+      console.error('Unhandled rejection — cleaning up browser:', reason);
+      await this.runAllCleanups();
+      if (process.env['VITEST'] || process.env['NODE_ENV'] === 'test') return;
+      process.exit(1);
+    });
+
     process.once('beforeExit', async () => {
       await this.runAllCleanups();
     });

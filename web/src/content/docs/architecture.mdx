@@ -1,0 +1,8 @@
+---
+title: Architecture
+description: Hexagonal, token-efficient, zero-zombie.
+---
+
+Hexagonal: Domain (Session/Action/PageState/Issue/TestReport + ElementRef) → Application (SessionManager, ActionExecutor, StateExtractor, ReportBuilder, ScenarioRunner, SitemapCrawler) → Adapters (PlaywrightDriver, TelemetryObserver, Reporters, MCP Server, CLI, Dashboard).
+
+Key: ARIA pruning >90% tokens, smart auto-wait + self-healing, telemetry pipeline (console/pageerror/response/requestfailed), ProcessGuard SIGINT/SIGTERM/SIGHUP/uncaught/unhandled, path-traversal guards.

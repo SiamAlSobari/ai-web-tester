@@ -1,6 +1,6 @@
 node_modules/
 dist/
-docs/
+/docs/
 coverage/
 test-reports/
 artifacts/
@@ -12,3 +12,4 @@ artifacts/
 # test artifacts
 __nonexistent_baseline_*.png
 diff-*.png
+.astro/

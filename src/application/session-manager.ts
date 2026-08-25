@@ -98,10 +98,17 @@ export class SessionManager {
 
   async executeAction(params: ExecuteActionParams, sessionId?: string): Promise<ExecuteActionResult> {
     const sid = sessionId || this.activeSessionId || undefined;
+    if (params.type === 'navigate' && params.value) {
+      assertUrlAllowed(params.value, this.securityConfig);
+    }
     const session = this.getSession(sid);
     const result = await this.getExecutor(sid).execute(session, params);
     publishLiveEvent('action:executed', { sessionId: sid, action: result.action.toJSON() });
     return result;
+  }
+
+  enforceAllowed(url: string): void {
+    assertUrlAllowed(url, this.securityConfig);
   }
 
   async assert(params: AssertParams): Promise<{ sessionId: string; result: AssertionResult }> {

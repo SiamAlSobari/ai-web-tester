@@ -19,6 +19,11 @@ describe('Autonomous Smart Crawler & Sitemap Explorer', () => {
 
   it('crawls internal links, extracts sitemap tree, and formats Markdown report', async () => {
     server = http.createServer((req, res) => {
+      if (req.url === '/sitemap.xml') {
+        res.writeHead(404, { 'Content-Type': 'text/xml' });
+        res.end('<error>not found</error>');
+        return;
+      }
       res.writeHead(200, { 'Content-Type': 'text/html' });
       if (req.url === '/') {
         res.end(`

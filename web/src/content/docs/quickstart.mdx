@@ -1,0 +1,43 @@
+---
+title: Quickstart
+description: 1-command install, then test.
+---
+
+## 1. Install wizard
+
+```bash
+npx ai-web-tester init
+# or
+node dist/cli.js init -a opencode
+node dist/cli.js init -a antigravity opencode claude cursor windsurf
+```
+
+The wizard writes MCP config for the chosen agent(s) and installs skills under `~/.config/opencode/skills` etc.
+
+## 2. Open a page
+
+```bash
+node dist/cli.js open http://localhost:3000 -d "iPhone 15"
+```
+
+Returns the ARIA tree:
+
+```text
+[1] textbox "Email" (required)
+[2] textbox "Password" (type=password)
+[3] button "Sign In"
+```
+
+Use refs: `click(ref=3)` or `fill(ref=1, "admin@test.com")`.
+
+## 3. Run a smoke test
+
+```bash
+node dist/cli.js test http://localhost:3000 --title "Smoke" --trace --html --junit
+```
+
+Report → `./test-reports/report-*.md`, trace → `./artifacts/traces/`.
+
+## 4. Via MCP (agent)
+
+Tools: `browser_open`, `browser_act`, `browser_inspect`, `browser_screenshot`, `browser_report`, `browser_close`, plus `browser_crawl`, `browser_audit_a11y`, `browser_assert`, etc. See [MCP Overview](/mcp/overview).

@@ -1,0 +1,10 @@
+---
+title: Dashboard
+description: Local UI on 3100.
+---
+
+```bash
+ai-test ui --port 3100
+```
+
+Features: `GET /api/reports?page&limit`, `GET /api/report/:file`, `GET /artifacts/*`, `GET /api/events` SSE for `session:start|action:executed|report:generated`. Paginated, path-traversal guarded.

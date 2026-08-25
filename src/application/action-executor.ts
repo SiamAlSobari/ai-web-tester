@@ -105,15 +105,15 @@ export class ActionExecutor {
             return;
           case 'click':
             if (params.ref === undefined) throw new Error('Ref ID required for click action');
-            await this.selfHealing(() => this.driver.click(params.ref!), params.ref);
+            await this.selfHealing(() => this.driver.click(params.ref!), params.ref, 'click');
             return;
           case 'fill':
             if (params.ref === undefined) throw new Error('Ref ID required for fill action');
-            await this.selfHealing(() => this.driver.fill(params.ref!, params.value ?? ''), params.ref);
+            await this.selfHealing(() => this.driver.fill(params.ref!, params.value ?? ''), params.ref, 'fill');
             return;
           case 'hover':
             if (params.ref === undefined) throw new Error('Ref ID required for hover action');
-            await this.selfHealing(() => this.driver.hover(params.ref!), params.ref);
+            await this.selfHealing(() => this.driver.hover(params.ref!), params.ref, 'hover');
             return;
           case 'press':
             if (!params.value) throw new Error('Key name required for press action');
@@ -170,7 +170,7 @@ export class ActionExecutor {
    * based resolution before giving up. This reduces flakiness after dynamic
    * re-renders where the cached ref locator went stale.
    */
-  private async selfHealing(primary: () => Promise<void>, ref: number): Promise<void> {
+  private async selfHealing(primary: () => Promise<void>, ref: number, primaryType?: string): Promise<void> {
     try {
       await primary();
       return;
@@ -178,23 +178,29 @@ export class ActionExecutor {
       const page = this.driver.getRawPage?.() as unknown;
       if (page && typeof (page as { locator?: unknown }).locator === 'function') {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const elRef = (this.driver as any)['elementRefCache']?.get?.(ref) ?? null;
+        const elRef = (this.driver as any)['elementRefCache']?.get?.(ref) ?? (this.driver as any)['getElementRef']?.(ref) ?? null;
         if (elRef) {
-          const selector = this.buildFallbackSelector(elRef);
-          if (selector) {
+          const selectors = this.buildFallbackSelectors(elRef);
+          for (const selector of selectors) {
             try {
               // eslint-disable-next-line @typescript-eslint/no-explicit-any
               const loc = (page as any).locator(selector).first();
-              await loc.scrollIntoViewIfNeeded({ timeout: 5000 }).catch(() => {});
-              if (primary === this.driver.click.bind(this.driver, ref)) {
+              await loc.waitFor({ state: 'visible', timeout: 3000 }).catch(() => {});
+              await loc.scrollIntoViewIfNeeded({ timeout: 3000 }).catch(() => {});
+              // Dispatch by type instead of bind identity comparison
+              if (primaryType === 'click') {
                 await loc.click({ timeout: 5000 });
                 return;
+              } else if (primaryType === 'fill') {
+                // Fill via fallback locator directly
+                await loc.fill((elRef as { value?: string })?.value ?? '', { timeout: 5000 }).catch(async () => loc.click({ timeout: 2000 }).then(() => (page as { keyboard?: { type: (t: string) => Promise<void> } }).keyboard?.type('')));
+                return;
               }
-              // Generic retry of primary after re-scan (locators refreshed)
+              await loc.click({ timeout: 3000 }).catch(() => {});
               await primary();
               return;
             } catch {
-              // fall through to throw primary error
+              // try next selector
             }
           }
         }
@@ -204,13 +210,23 @@ export class ActionExecutor {
   }
 
   private buildFallbackSelector(elRef: { role?: string; name?: string; tag?: string; type?: string }): string | null {
-    const name = elRef.name?.trim();
-    if (name && elRef.role) {
-      return `${elRef.role === 'button' || elRef.role === 'link' ? elRef.tag ?? elRef.role : elRef.role}:has-text("${name.slice(0, 40)}")`;
+    const list = this.buildFallbackSelectors(elRef);
+    return list[0] ?? null;
+  }
+
+  private buildFallbackSelectors(elRef: { role?: string; name?: string; tag?: string; type?: string; placeholder?: string }): string[] {
+    const name = elRef.name?.trim()?.slice(0, 40)?.replace(/"/g, '\\"');
+    const selectors: string[] = [];
+    if (name) {
+      // Prefer getByRole semantics via CSS + :has-text
+      if (elRef.role) selectors.push(`${elRef.role}:has-text("${name}")`);
+      selectors.push(`text="${name}"`);
+      selectors.push(`[aria-label="${name}"]`);
     }
-    if (name) return `text="${name.slice(0, 40)}"`;
-    if (elRef.tag && elRef.type) return `${elRef.tag}[type="${elRef.type}"]`;
-    return null;
+    if (elRef.placeholder) selectors.push(`[placeholder="${elRef.placeholder.replace(/"/g, '\\"')}"]`);
+    if (elRef.tag && elRef.type) selectors.push(`${elRef.tag}[type="${elRef.type}"]`);
+    if (elRef.tag) selectors.push(elRef.tag);
+    return selectors.filter(Boolean);
   }
 
   private buildActionSummary(action: Action, state: PageState): string {

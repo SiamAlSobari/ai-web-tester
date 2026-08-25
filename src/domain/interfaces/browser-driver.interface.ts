@@ -8,8 +8,11 @@ export interface LaunchOptions {
   timeoutMs?: number;
   storageState?: string;
   device?: string;
+  browser?: 'chromium' | 'firefox' | 'webkit';
   networkProfile?: 'None' | 'Fast 3G' | 'Slow 3G' | 'Offline';
   recordTrace?: boolean;
+  recordVideo?: { dir?: string; size?: { width: number; height: number } };
+  recordHar?: { path?: string; mode?: 'full' | 'minimal' };
 }
 
 export interface CrawlPageData {
@@ -87,6 +90,11 @@ export interface IBrowserDriver {
   compareScreenshot?(currentPath: string, baselinePath: string, threshold?: number): Promise<{ hasDiff: boolean; diffPercentage: number; message: string }>;
   isTracingActive?(): boolean;
   saveTrace?(tracePath: string): Promise<void>;
+  healthCheck?(): Promise<{ alive: boolean; browser: string; version: string; pages: number; artifactsSizeKb: number }>;
+  waitForSelector?(ref: number, state: 'visible' | 'hidden' | 'attached' | 'detached', timeoutMs?: number): Promise<void>;
+  extractValue?(ref: number, attribute: 'text' | 'value' | 'html' | 'href'): Promise<string>;
+  apiRequest?(options: { method: string; url: string; body?: string | Record<string, unknown>; headers?: Record<string, string> }): Promise<{ status: number; body: string }>;
+  getElementRef?(ref: number): import('../value-objects/element-ref.vo.js').ElementRef | undefined;
 }
 
 

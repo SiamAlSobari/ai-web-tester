@@ -1,0 +1,305 @@
+---
+import '../styles/global.css';
+
+const title = "AI Web Tester | Autonomous Browser Testing Engine for AI Coding Agents";
+const desc = "Equip AI assistants with automated browser execution, ARIA DOM token pruning, and comprehensive telemetry. Headless Chromium, 17 MCP tools, zero hallucinations.";
+---
+<!doctype html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>{title}</title>
+  <meta name="description" content={desc} />
+  <meta name="theme-color" content="#0a0f1c" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Fragment+Mono&family=IBM+Plex+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+  <style>
+    ::selection { background: #f59e0b; color: #0a0f1c; }
+    * { scrollbar-width: thin; scrollbar-color: #334155 #0a0f1c; }
+    *::-webkit-scrollbar { width: 8px; height: 8px; }
+    *::-webkit-scrollbar-thumb { background: #334155; border-radius: 999px; }
+    :focus-visible { outline: 2px solid #06b6d4; outline-offset: 2px; }
+  </style>
+</head>
+<body class="bg-[#0a0f1c] text-[#f8fafc] font-sans antialiased">
+  <!-- Nav -->
+  <header class="sticky top-0 z-40 backdrop-blur bg-[#0a0f1c]/90 border-b border-[#1e293b]">
+    <div class="mx-auto max-w-[1160px] px-6 h-[64px] flex items-center justify-between">
+      <a href="/" class="flex items-center gap-3">
+        <span class="w-8 h-8 rounded-lg bg-[#0f172a] border border-[#1e293b] grid place-items-center">
+          <span class="w-2.5 h-2.5 rounded-full bg-amber-400"></span>
+        </span>
+        <span class="font-mono text-[13px] tracking-[0.14em] font-semibold text-slate-100">AI WEB TESTER</span>
+        <span class="hidden sm:inline text-[11px] px-2 py-0.5 rounded-full border border-[#1e293b] text-slate-400 font-mono">v0.3.1 · MCP</span>
+      </a>
+      <nav class="hidden md:flex items-center gap-6 text-[13px] text-slate-300">
+        <a href="/intro" class="hover:text-white transition-colors">Docs</a>
+        <a href="/cli/overview" class="hover:text-white transition-colors">CLI</a>
+        <a href="/mcp/overview" class="hover:text-white transition-colors">MCP Tools</a>
+        <a href="https://github.com/SiamAlSobari/ai-web-tester" class="hover:text-white transition-colors">GitHub</a>
+      </nav>
+      <div class="flex items-center gap-3">
+        <a href="/intro" class="hidden sm:inline text-[13px] px-4 py-2 rounded-full border border-[#334155] text-slate-200 hover:border-slate-400 transition-colors">Documentation</a>
+        <a href="#install" class="text-[13px] px-4 py-2 rounded-full bg-amber-400 text-black font-semibold hover:bg-amber-300 transition-colors">Install Setup</a>
+      </div>
+    </div>
+  </header>
+
+  <!-- HERO -->
+  <section class="mx-auto max-w-[1160px] px-6 pt-10 pb-8 lg:pt-14">
+    <div class="grid lg:grid-cols-[1.05fr_0.95fr] gap-10 items-start">
+      <div>
+        <div class="inline-flex items-center gap-2 text-[11px] tracking-[0.14em] font-mono text-slate-400 border border-[#1e293b] rounded-full px-3 py-1.5">
+          <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
+          HEADLESS CHROMIUM · ARIA PRUNING · 360 TELEMETRY
+        </div>
+        <h1 class="mt-6 font-bold leading-[0.94] tracking-[-0.03em] text-[40px] sm:text-[52px] lg:text-[56px]">
+          Autonomous browser execution<br/>
+          <span class="text-amber-400">for AI coding agents</span>
+        </h1>
+        <p class="mt-5 text-[16px] leading-7 text-slate-300 max-w-[56ch]">
+          Code generation without visual verification creates blind spots. AI Web Tester drives real web sessions, validates DOM mutations, detects runtime exceptions, and produces structured markdown reports with deterministic element references.
+        </p>
+        <div class="mt-7 flex flex-wrap gap-3 items-center">
+          <a href="#install" class="px-5 py-3 rounded-full bg-amber-400 text-black font-semibold text-[14px] hover:bg-amber-300 transition-colors">
+            npx ai-test init &rarr;
+          </a>
+          <a href="/intro" class="px-5 py-3 rounded-full border border-[#334155] text-slate-200 text-[14px] hover:border-slate-400 transition-colors">
+            Explore Documentation
+          </a>
+          <span class="inline-flex items-center gap-2 text-[12px] text-slate-400 font-mono">
+            <span class="w-1.5 h-1.5 rounded-full bg-cyan-400"></span> Node &gt;= 20 · Playwright 1.49 · ESM
+          </span>
+        </div>
+        <div class="mt-8 grid grid-cols-3 divide-x divide-[#1e293b] border border-[#1e293b] rounded-2xl overflow-hidden max-w-[560px] bg-[#0f172a]">
+          <div class="px-5 py-4">
+            <div class="font-mono text-[22px] font-semibold text-slate-100">&gt;90%</div>
+            <div class="text-[11px] tracking-[0.1em] text-slate-400">TOKEN CUT</div>
+          </div>
+          <div class="px-5 py-4">
+            <div class="font-mono text-[22px] font-semibold text-slate-100">17</div>
+            <div class="text-[11px] tracking-[0.1em] text-slate-400">MCP TOOLS</div>
+          </div>
+          <div class="px-5 py-4">
+            <div class="font-mono text-[22px] font-semibold text-slate-100">5</div>
+            <div class="text-[11px] tracking-[0.1em] text-slate-400">SUPPORTED AGENTS</div>
+          </div>
+        </div>
+        <div class="mt-4 flex flex-wrap gap-2 text-[11px] font-mono text-slate-400">
+          <span class="px-2.5 py-1 rounded-full bg-[#111827] border border-[#1e293b]">OpenCode</span>
+          <span class="px-2.5 py-1 rounded-full bg-[#111827] border border-[#1e293b]">Antigravity</span>
+          <span class="px-2.5 py-1 rounded-full bg-[#111827] border border-[#1e293b]">Claude Code</span>
+          <span class="px-2.5 py-1 rounded-full bg-[#111827] border border-[#1e293b]">Cursor</span>
+          <span class="px-2.5 py-1 rounded-full bg-[#111827] border border-[#1e293b]">Windsurf</span>
+        </div>
+      </div>
+
+      <!-- Right: Live bench -->
+      <div class="space-y-4">
+        <div class="rounded-[20px] border border-[#1e293b] bg-[#0f172a] overflow-hidden">
+          <div class="flex items-center justify-between px-4 h-11 border-b border-[#1e293b] bg-[#0a0f1c]">
+            <span class="font-mono text-[11px] tracking-[0.12em] text-slate-400">ARIA BENCH: LIVE SESSION</span>
+            <span class="text-[11px] px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-300 border border-emerald-500/20 font-mono">STATUS: PASSED (3420ms)</span>
+          </div>
+          <div class="p-4 font-mono text-[12.5px] leading-6">
+            <div class="text-slate-400">PAGE: "Customer Portal" (1280x720)</div>
+            <div class="mt-3 space-y-1">
+              <div><span class="text-amber-400">[1]</span> textbox "Email" <span class="text-slate-400">(required, placeholder="name@domain.com")</span></div>
+              <div><span class="text-amber-400">[2]</span> textbox "Password" <span class="text-slate-400">(type=password)</span></div>
+              <div><span class="text-amber-400">[3]</span> button "Sign In"</div>
+              <div><span class="text-amber-400">[4]</span> link "Forgot Password?"</div>
+            </div>
+            <div class="mt-4 grid grid-cols-2 gap-2 text-[11px]">
+              <div class="rounded-lg bg-[#0a0f1c] border border-[#1e293b] p-2.5 font-mono">click(<span class="text-amber-400">ref=3</span>) <span class="text-emerald-400">&rarr; 200 OK</span></div>
+              <div class="rounded-lg bg-[#0a0f1c] border border-[#1e293b] p-2.5 font-mono">fill(ref=1, <span class="text-cyan-300">"admin@test.com"</span>)</div>
+            </div>
+          </div>
+          <div class="px-4 py-3 border-t border-[#1e293b] flex items-center justify-between text-[11px] font-mono">
+            <span class="text-slate-400">Telemetry artifacts saved to ./artifacts/</span>
+            <span class="text-emerald-300">0 anomalies detected</span>
+          </div>
+        </div>
+        <div class="rounded-2xl border border-amber-400/20 bg-amber-400/10 p-4 flex items-start gap-3">
+          <span class="w-6 h-6 rounded-md bg-amber-400 text-black grid place-items-center font-mono font-bold text-xs shrink-0">i</span>
+          <div class="text-[13px] leading-6 text-slate-200">
+            <strong class="text-white">Deterministic Execution:</strong> Catch React hydration mismatch, unhandled 500 API responses, and inaccessible elements before code is committed.
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Highlights -->
+  <section class="mx-auto max-w-[1160px] px-6 py-8">
+    <div class="grid lg:grid-cols-3 gap-4">
+      <div class="rounded-[18px] border border-[#1e293b] bg-[#0f172a] p-6">
+        <div class="font-mono text-[11px] tracking-[0.14em] text-amber-400">01 / QA MATRIX</div>
+        <h3 class="mt-2 text-[16px] font-semibold text-slate-100">Senior QA Matrices Built-in</h3>
+        <p class="mt-2 text-[13px] leading-6 text-slate-400">
+          Positive flows, negative validations, boundary limits, and injection resilience tested in a single test run.
+        </p>
+        <div class="mt-4 font-mono text-[11px] text-slate-500">SQL injection tests, XSS payloads, 401 handling</div>
+      </div>
+      <div class="rounded-[18px] border border-[#1e293b] bg-[#0f172a] p-6">
+        <div class="font-mono text-[11px] tracking-[0.14em] text-cyan-400">02 / TOKEN PRUNING</div>
+        <h3 class="mt-2 text-[16px] font-semibold text-slate-100">ARIA Tree Compression</h3>
+        <p class="mt-2 text-[13px] leading-6 text-slate-400">
+          Raw DOM nodes are pruned into clean interactive reference IDs. Reduces token overhead by over 90% and prevents selector hallucinations.
+        </p>
+        <code class="mt-4 block rounded-lg bg-[#020617] border border-[#1e293b] p-3 font-mono text-[11px] text-slate-300">click(ref=3) · fill(ref=1, "admin")</code>
+      </div>
+      <div class="rounded-[18px] border border-[#1e293b] bg-[#0f172a] p-6">
+        <div class="font-mono text-[11px] tracking-[0.14em] text-emerald-400">03 / TELEMETRY</div>
+        <h3 class="mt-2 text-[16px] font-semibold text-slate-100">Runtime Telemetry Watchdog</h3>
+        <p class="mt-2 text-[13px] leading-6 text-slate-400">
+          Asynchronously aggregates console errors, unhandled exceptions, failed network calls, and page crash events.
+        </p>
+        <div class="mt-4 text-[11px] font-mono text-slate-500">Targeted screenshots captured on failure</div>
+      </div>
+    </div>
+    <div class="mt-4 grid lg:grid-cols-3 gap-4">
+      <div class="rounded-[18px] border border-[#1e293b] bg-[#0a0f1c] p-6">
+        <div class="font-mono text-[11px] tracking-[0.12em] text-slate-400">PROCESS ISOLATION</div>
+        <div class="mt-2 text-[14px] font-medium text-slate-200">Headless by default</div>
+        <p class="mt-1 text-[13px] text-slate-400">Clean process lifecycle management with automatic cleanup on SIGINT and SIGTERM.</p>
+      </div>
+      <div class="rounded-[18px] border border-[#1e293b] bg-[#0a0f1c] p-6">
+        <div class="font-mono text-[11px] tracking-[0.12em] text-slate-400">AUDITABLE OUTPUT</div>
+        <div class="mt-2 text-[14px] font-medium text-slate-200">Structured Reports</div>
+        <p class="mt-1 text-[13px] text-slate-400">Markdown with YAML frontmatter, execution metrics, issue logs, and direct file links.</p>
+      </div>
+      <div class="rounded-[18px] border border-[#1e293b] bg-[#0a0f1c] p-6">
+        <div class="font-mono text-[11px] tracking-[0.12em] text-slate-400">ACCESSIBILITY</div>
+        <div class="mt-2 text-[14px] font-medium text-slate-200">Automated A11y &amp; Crawling</div>
+        <p class="mt-1 text-[13px] text-slate-400">Integrated axe-core engine for WCAG 2.1 AA compliance and sitemap crawling.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- MCP grid -->
+  <section class="mx-auto max-w-[1160px] px-6 py-10">
+    <div class="flex items-end justify-between gap-4">
+      <div>
+        <div class="text-[11px] font-mono tracking-[0.14em] text-slate-400 uppercase">Tool Specifications</div>
+        <h2 class="mt-1 text-[22px] font-semibold tracking-[-0.02em] text-slate-100">17 MCP Tools in a Unified Suite</h2>
+      </div>
+      <a href="/mcp/overview" class="text-[13px] text-slate-400 hover:text-white transition-colors">View specifications &rarr;</a>
+    </div>
+    <div class="mt-5 grid sm:grid-cols-2 lg:grid-cols-4 gap-3 font-mono text-[12px]">
+      {[
+        ['browser_open','url · headless · device · storageState · trace'],
+        ['browser_act','click / fill / hover / press / select / scroll / upload'],
+        ['browser_inspect','refresh refs & capture telemetry state'],
+        ['browser_switch_tab','multi-tab navigation and OAuth popups'],
+        ['browser_save_auth','cookies and storageState persistence'],
+        ['browser_audit_a11y','axe-core automated WCAG 2.1 AA auditing'],
+        ['browser_crawl','depth-limited crawler and 404 detection'],
+        ['browser_screenshot','fullPage capture and baseline pixel diffing'],
+        ['browser_report','markdown generation with YAML metadata'],
+        ['browser_assert','element visibility, text, and value checking'],
+        ['browser_assert_perf','FCP, DOM load, and TTFB budget validation'],
+        ['browser_mock','network route mocking for 4xx/5xx simulations'],
+        ['browser_sessions','enumeration of active browser contexts'],
+        ['browser_health','health probe, memory, and engine status'],
+        ['browser_wait_for','deterministic wait for state attachment'],
+        ['browser_extract','content extraction for text, values, and HTML'],
+        ['browser_close','session teardown and memory reclamation'],
+      ].map(([name, desc]) => (
+        <div class="rounded-xl border border-[#1e293b] bg-[#0f172a] p-4">
+          <div class="text-amber-300 font-semibold">{name}</div>
+          <div class="mt-1 text-slate-400 leading-5 text-[11.5px]">{desc}</div>
+        </div>
+      ))}
+    </div>
+  </section>
+
+  <!-- Install -->
+  <section id="install" class="mx-auto max-w-[1160px] px-6 py-8">
+    <div class="rounded-[20px] border border-[#1e293b] bg-[#0f172a] overflow-hidden">
+      <div class="px-6 py-5 border-b border-[#1e293b] flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h2 class="text-[18px] font-semibold text-slate-100">Setup Across All Major Coding Agents</h2>
+          <p class="text-[12px] text-slate-400 mt-0.5">Automated configuration installer for your editor environment.</p>
+        </div>
+        <span class="font-mono text-[11px] tracking-[0.12em] text-slate-400">npx ai-test init</span>
+      </div>
+      <div class="grid lg:grid-cols-[1.1fr_0.9fr] gap-0">
+        <div class="p-6">
+          <div class="flex flex-wrap gap-2 text-[11px] font-mono">
+            <span class="px-3 py-1.5 rounded-full bg-amber-400 text-black font-semibold">all agents</span>
+            <span class="px-3 py-1.5 rounded-full border border-[#1e293b] text-slate-400">opencode</span>
+            <span class="px-3 py-1.5 rounded-full border border-[#1e293b] text-slate-400">antigravity</span>
+            <span class="px-3 py-1.5 rounded-full border border-[#1e293b] text-slate-400">claude</span>
+            <span class="px-3 py-1.5 rounded-full border border-[#1e293b] text-slate-400">cursor</span>
+            <span class="px-3 py-1.5 rounded-full border border-[#1e293b] text-slate-400">windsurf</span>
+          </div>
+          <pre class="mt-4 rounded-xl bg-[#020617] border border-[#1e293b] p-4 font-mono text-[13px] leading-6 overflow-auto text-slate-200"><code><span class="text-slate-500"># Interactive configuration wizard</span>
+npx ai-test init
+
+<span class="text-slate-500"># Or target specific agent configurations directly</span>
+npx ai-test init -a opencode
+npx ai-test init -a antigravity claude cursor windsurf
+
+<span class="text-slate-500"># Verification</span>
+npx ai-test --help</code></pre>
+          <div class="mt-4 flex gap-2">
+            <a href="/installation" class="px-4 py-2 rounded-full bg-white text-black text-[13px] font-semibold hover:bg-slate-200 transition-colors">Installation Guide &rarr;</a>
+            <a href="https://github.com/SiamAlSobari/ai-web-tester" class="px-4 py-2 rounded-full border border-[#334155] text-slate-200 text-[13px] hover:border-slate-400 transition-colors">GitHub Repository</a>
+          </div>
+        </div>
+        <div class="border-t lg:border-t-0 lg:border-l border-[#1e293b] p-6 bg-[#0a0f1c]">
+          <div class="font-mono text-[11px] tracking-[0.12em] text-slate-400">CLI COMMAND REFERENCE</div>
+          <pre class="mt-3 rounded-xl bg-[#020617] border border-[#1e293b] p-4 font-mono text-[12px] leading-6 overflow-auto text-slate-200"><code>ai-test open http://localhost:3000 -d "iPhone 15"
+ai-test test http://localhost:3000 --trace --html
+ai-test crawl http://localhost:3000 --depth 3 --pages 20
+ai-test run ./scenario.yaml
+ai-test ui --port 3100</code></pre>
+          <div class="mt-4 text-[12px] leading-6 text-slate-400">
+            Requires Node &gt;= 20. Chromium is installed with <code class="px-1.5 py-0.5 rounded bg-[#1e293b] text-slate-200">npx playwright install chromium</code>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Report preview -->
+  <section class="mx-auto max-w-[1160px] px-6 py-8">
+    <div class="grid lg:grid-cols-[0.95fr_1.05fr] gap-6 items-start">
+      <div>
+        <h2 class="text-[18px] font-semibold text-slate-100">Machine-Readable &amp; Human-Auditable Reports</h2>
+        <p class="mt-2 text-[13px] leading-6 text-slate-400">
+          Markdown with structured frontmatter, step execution tables, error stack traces, and direct links to screenshot artifacts. HTML and JUnit export formats available for CI/CD pipelines.
+        </p>
+        <div class="mt-4 flex gap-2 text-[12px] font-mono">
+          <span class="px-3 py-1.5 rounded-full bg-emerald-500/15 text-emerald-300 border border-emerald-500/20">STATUS: PASSED (3.42s)</span>
+          <span class="px-3 py-1.5 rounded-full border border-[#1e293b] text-slate-400">5 steps completed</span>
+          <span class="px-3 py-1.5 rounded-full border border-[#1e293b] text-slate-400">0 failures</span>
+        </div>
+      </div>
+      <pre class="rounded-2xl bg-[#020617] border border-[#1e293b] p-5 font-mono text-[11.5px] leading-6 overflow-auto text-slate-200"><code><span class="text-slate-500">---</span>
+<span class="text-cyan-300">test_run_id</span>: "rep-1723651234-a8f2"
+<span class="text-cyan-300">status</span>: "PASSED"
+<span class="text-cyan-300">duration_ms</span>: 3420
+<span class="text-slate-500">---</span>
+<span class="text-amber-300"># Test Report: Authentication Flow</span>
+[PASS] Step 1: CLICK [ref=3] (empty validation)
+[PASS] Step 2: FILL [ref=1] "invalid-email" (format)
+[PASS] Step 3: FILL [ref=1] "' OR '1'='1" (injection)
+[PASS] Step 4: FILL [ref=1] "valid@company.com"
+[PASS] Step 5: FILL [ref=2] "correctpass123"
+<span class="text-emerald-400">No runtime console errors or HTTP network failures detected.</span></code></pre>
+    </div>
+  </section>
+
+  <!-- Footer -->
+  <footer class="mt-8 border-t border-[#1e293b]">
+    <div class="mx-auto max-w-[1160px] px-6 py-8 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 text-[13px] text-slate-400">
+      <span>(c) {new Date().getFullYear()} AI Web Tester. MIT License. Built with Playwright and Starlight.</span>
+      <span class="font-mono text-[11px] tracking-[0.1em] text-slate-500">DARK LAB BENCH: INK / AMBER / CYAN</span>
+    </div>
+  </footer>
+</body>
+</html>
+

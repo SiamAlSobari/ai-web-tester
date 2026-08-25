@@ -1,0 +1,10 @@
+---
+title: Browser Control
+description: Open, act, inspect, tabs, auth.
+---
+
+`browser_open` launches `chromium|firefox|webkit`, device presets (iPhone 15 etc), viewport, networkProfile `None|Fast 3G|Slow 3G|Offline`, trace/video/HAR.
+
+`browser_act` actions: `click, fill, hover, press, select, scroll, upload, download, switch_tab, screenshot` with `ref` deterministic.
+
+`browser_save_auth` persists `storageState` JSON; pass it back to `browser_open`.

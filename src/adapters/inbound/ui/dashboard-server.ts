@@ -50,34 +50,51 @@ export class DashboardServer {
         return;
       }
 
-      // API: List test reports
+      // API: List test reports (paginated)
       if (pathname === '/api/reports') {
         try {
-          const files = await fs.readdir(reportsDir);
+          const page = parseInt(parsedUrl.searchParams.get('page') ?? '1', 10);
+          const limit = Math.min(parseInt(parsedUrl.searchParams.get('limit') ?? '20', 10), 50);
+          const allFiles = await fs.readdir(reportsDir);
+          const mdFiles = allFiles.filter((f) => f.endsWith('.md') || f.endsWith('.html') || f.endsWith('.xml'));
+          // Sort by mtime desc without reading all
+          const withStat = await Promise.all(mdFiles.map(async (f) => ({ f, stat: await fs.stat(path.join(reportsDir, f)).catch(() => null) })));
+          withStat.sort((a, b) => (b.stat?.mtime.getTime() ?? 0) - (a.stat?.mtime.getTime() ?? 0));
+          const total = withStat.length;
+          const slice = withStat.slice((page - 1) * limit, page * limit);
           const reports = [];
-          for (const file of files) {
-            if (file.endsWith('.md') || file.endsWith('.html') || file.endsWith('.xml')) {
-              const content = await fs.readFile(path.join(reportsDir, file), 'utf-8');
-              reports.push({
-                filename: file,
-                content,
-                modifiedAt: (await fs.stat(path.join(reportsDir, file))).mtime,
-              });
-            }
+          for (const { f, stat } of slice) {
+            const content = await fs.readFile(path.join(reportsDir, f), 'utf-8');
+            reports.push({ filename: f, content: content.slice(0, 8000), fullLength: content.length, modifiedAt: stat?.mtime ?? new Date() });
           }
           res.writeHead(200, { 'Content-Type': 'application/json' });
-          res.end(JSON.stringify({ reports }));
+          res.end(JSON.stringify({ reports, total, page, limit }));
         } catch {
           res.writeHead(500, { 'Content-Type': 'application/json' });
           res.end(JSON.stringify({ error: 'Failed to read reports' }));
         }
         return;
       }
+      // API: single report full content
+      if (pathname.startsWith('/api/report/')) {
+        const fname = decodeURIComponent(pathname.replace('/api/report/', ''));
+        if (fname.includes('..') || fname.includes('/') || fname.includes('\\')) {
+          res.writeHead(400, { 'Content-Type': 'text/plain' }); res.end('Invalid filename'); return;
+        }
+        try {
+          const content = await fs.readFile(path.join(reportsDir, fname), 'utf-8');
+          res.writeHead(200, { 'Content-Type': 'text/plain; charset=utf-8' }); res.end(content);
+        } catch { res.writeHead(404, { 'Content-Type': 'text/plain' }); res.end('Not found'); }
+        return;
+      }
 
-      // Serve Artifacts (images, diffs, downloads)
+      // Serve Artifacts (images, diffs, downloads) — path traversal guard
       if (pathname.startsWith('/artifacts/')) {
         const relPath = pathname.replace('/artifacts/', '');
+        if (relPath.includes('..')) { res.writeHead(400, { 'Content-Type': 'text/plain' }); res.end('Invalid path'); return; }
         const targetPath = path.join(artifactsDir, relPath);
+        const resolved = path.resolve(targetPath);
+        if (!resolved.startsWith(path.resolve(artifactsDir))) { res.writeHead(403, { 'Content-Type': 'text/plain' }); res.end('Forbidden'); return; }
         try {
           const fileBuf = await fs.readFile(targetPath);
           const ext = path.extname(targetPath).toLowerCase();
@@ -125,48 +142,59 @@ export class DashboardServer {
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>AI Web Tester — Local Quality Dashboard</title>
+  <title>AI Web Tester | Local Quality Dashboard</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
   <style>
     :root {
-      --bg: #0f172a;
-      --card-bg: #1e293b;
-      --border: #334155;
+      --bg: #0a0f1c;
+      --card-bg: #0f172a;
+      --border: #1e293b;
+      --border-focus: #334155;
       --text: #f8fafc;
       --text-muted: #94a3b8;
-      --primary: #38bdf8;
-      --success: #22c55e;
-      --danger: #ef4444;
-      --warning: #f59e0b;
+      --primary: #f59e0b;
+      --cyan: #38bdf8;
+      --success: #4ade80;
+      --danger: #f87171;
     }
-    * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
-    body { background: var(--bg); color: var(--text); padding: 24px; }
-    .container { max-width: 1200px; margin: 0 auto; }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { background: var(--bg); color: var(--text); padding: 24px; font-family: 'IBM Plex Sans', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+    .container { max-width: 1280px; margin: 0 auto; }
     header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; padding-bottom: 16px; border-bottom: 1px solid var(--border); }
-    h1 { font-size: 24px; font-weight: 700; color: var(--primary); }
+    .logo-badge { display: inline-flex; align-items: center; gap: 8px; font-family: 'JetBrains Mono', monospace; font-size: 13px; font-weight: 600; letter-spacing: 0.1em; color: var(--text); }
+    .logo-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--primary); }
+    .header-sub { color: var(--text-muted); font-size: 12px; margin-top: 4px; font-family: 'JetBrains Mono', monospace; }
+    .btn { background: var(--primary); color: #000; border: none; padding: 8px 16px; border-radius: 9999px; font-size: 13px; font-weight: 600; cursor: pointer; transition: opacity 0.15s; font-family: 'IBM Plex Sans', sans-serif; }
+    .btn:hover { opacity: 0.9; }
     .metrics { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; margin-bottom: 24px; }
-    .metric-card { background: var(--card-bg); border: 1px solid var(--border); border-radius: 8px; padding: 18px; }
-    .metric-label { font-size: 13px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; }
-    .metric-val { font-size: 28px; font-weight: bold; margin-top: 8px; }
+    .metric-card { background: var(--card-bg); border: 1px solid var(--border); border-radius: 10px; padding: 18px; }
+    .metric-label { font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.08em; font-family: 'JetBrains Mono', monospace; }
+    .metric-val { font-size: 26px; font-weight: 700; margin-top: 6px; font-family: 'JetBrains Mono', monospace; }
     .main-grid { display: grid; grid-template-columns: 360px 1fr; gap: 20px; }
-    .report-list { background: var(--card-bg); border: 1px solid var(--border); border-radius: 8px; overflow: hidden; height: 600px; overflow-y: auto; }
+    .report-list { background: var(--card-bg); border: 1px solid var(--border); border-radius: 10px; overflow: hidden; height: 620px; overflow-y: auto; }
     .report-item { padding: 14px; border-bottom: 1px solid var(--border); cursor: pointer; transition: background 0.15s; }
-    .report-item:hover, .report-item.active { background: #334155; }
-    .report-title { font-weight: 600; font-size: 14px; margin-bottom: 4px; }
-    .report-meta { font-size: 12px; color: var(--text-muted); }
-    .badge { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: bold; margin-bottom: 4px; }
-    .badge-passed { background: rgba(34, 197, 94, 0.2); color: var(--success); }
-    .badge-failed { background: rgba(239, 68, 68, 0.2); color: var(--danger); }
-    .viewer { background: var(--card-bg); border: 1px solid var(--border); border-radius: 8px; padding: 24px; height: 600px; overflow-y: auto; white-space: pre-wrap; font-family: monospace; font-size: 13px; line-height: 1.6; }
+    .report-item:hover, .report-item.active { background: #1e293b; }
+    .report-title { font-weight: 600; font-size: 13px; margin-bottom: 4px; font-family: 'JetBrains Mono', monospace; color: #e2e8f0; }
+    .report-meta { font-size: 11px; color: var(--text-muted); font-family: 'JetBrains Mono', monospace; }
+    .badge { display: inline-block; padding: 2px 8px; border-radius: 9999px; font-size: 10px; font-weight: 600; font-family: 'JetBrains Mono', monospace; margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.05em; }
+    .badge-passed { background: rgba(34, 197, 94, 0.15); color: var(--success); border: 1px solid rgba(34, 197, 94, 0.3); }
+    .badge-failed { background: rgba(239, 68, 68, 0.15); color: var(--danger); border: 1px solid rgba(239, 68, 68, 0.3); }
+    .viewer { background: #020617; border: 1px solid var(--border); border-radius: 10px; padding: 24px; height: 620px; overflow-y: auto; white-space: pre-wrap; font-family: 'JetBrains Mono', monospace; font-size: 12.5px; line-height: 1.6; color: #e2e8f0; }
   </style>
 </head>
 <body>
   <div class="container">
     <header>
       <div>
-        <h1>🌐 AI Web Tester Dashboard</h1>
-        <p style="color: var(--text-muted); font-size: 14px; margin-top: 4px;">Live Local Test Reports & Quality Telemetry</p>
+        <div class="logo-badge">
+          <div class="logo-dot"></div>
+          <span>AI Web Tester Dashboard</span>
+        </div>
+        <div class="header-sub">Local Execution Telemetry & Quality Reports</div>
       </div>
-      <button onclick="loadReports()" style="background: var(--primary); color: #000; border: none; padding: 8px 16px; border-radius: 6px; font-weight: 600; cursor: pointer;">🔄 Refresh</button>
+      <button class="btn" onclick="loadReports()">Refresh Data</button>
     </header>
 
     <div class="metrics">
@@ -184,16 +212,16 @@ export class DashboardServer {
       </div>
       <div class="metric-card">
         <div class="metric-label">Success Rate</div>
-        <div class="metric-val" id="m-rate" style="color: var(--primary);">100%</div>
+        <div class="metric-val" id="m-rate" style="color: var(--cyan);">100%</div>
       </div>
     </div>
 
     <div class="main-grid">
       <div class="report-list" id="report-list">
-        <div style="padding: 20px; text-align: center; color: var(--text-muted);">Loading reports...</div>
+        <div style="padding: 20px; text-align: center; color: var(--text-muted); font-size: 13px;">Loading reports...</div>
       </div>
       <div class="viewer" id="report-viewer">
-        Select a test report on the left to inspect its complete execution logs, assertions, and recommendations.
+        Select a test report on the left panel to inspect its execution trace, assertions, and issues.
       </div>
     </div>
   </div>
@@ -218,7 +246,7 @@ export class DashboardServer {
       let passed = 0;
       let failed = 0;
       reportsData.forEach(r => {
-        if (r.content.includes('status: "PASSED"') || r.content.includes('✅ PASSED')) {
+        if (r.content.includes('status: "PASSED"') || r.content.includes('[PASS]')) {
           passed++;
         } else {
           failed++;
@@ -234,11 +262,11 @@ export class DashboardServer {
     function renderList() {
       const listEl = document.getElementById('report-list');
       if (reportsData.length === 0) {
-        listEl.innerHTML = '<div style="padding: 20px; text-align: center; color: var(--text-muted);">No reports found in ./test-reports/</div>';
+        listEl.innerHTML = '<div style="padding: 20px; text-align: center; color: var(--text-muted); font-size: 13px;">No reports found in ./test-reports/</div>';
         return;
       }
       listEl.innerHTML = reportsData.map((r, idx) => {
-        const isPassed = r.content.includes('status: "PASSED"') || r.content.includes('✅ PASSED');
+        const isPassed = r.content.includes('status: "PASSED"') || r.content.includes('[PASS]');
         const badgeClass = isPassed ? 'badge-passed' : 'badge-failed';
         const badgeText = isPassed ? 'PASSED' : 'FAILED';
         return \`

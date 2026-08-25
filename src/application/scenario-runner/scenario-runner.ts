@@ -17,7 +17,12 @@ export interface ScenarioStep {
   assert?: { ref?: number | string; kind: AssertionKind; expected?: string | number | boolean; operator?: ComparisonOperator };
   assertPerf?: { metric: 'fcp' | 'load' | 'ttfb' | 'domContentLoaded' | 'dcl'; thresholdMs: number; operator?: 'lte' | 'lt' | 'gte' | 'gt' | 'equals' };
   mock?: { urlPattern: string; status?: number; body?: string | Record<string, unknown>; contentType?: string };
+  mockReset?: { urlPattern?: string };
   wait?: number;
+  waitFor?: { ref?: number | string; state?: 'visible' | 'hidden' | 'attached' | 'detached'; timeoutMs?: number };
+  extract?: { varName: string; ref?: number | string; attribute?: 'text' | 'value' | 'html' | 'href' };
+  request?: { method?: string; url: string; body?: string | Record<string, unknown>; headers?: Record<string, string>; expectStatus?: number };
+  retry?: { attempts?: number };
 }
 
 export interface ScenarioConfig {
@@ -27,6 +32,11 @@ export interface ScenarioConfig {
   storageState?: string;
   device?: string;
   data?: Record<string, string | number>[]; // Feature #14: data-driven rows
+  browser?: 'chromium' | 'firefox' | 'webkit';
+  retries?: number;
+  concurrency?: number;
+  beforeAll?: ScenarioStep[];
+  afterAll?: ScenarioStep[];
   steps: ScenarioStep[];
 }
 
@@ -55,93 +65,112 @@ export class ScenarioRunner {
     const failures: string[] = [];
     const dataRows = config.data && config.data.length > 0 ? config.data : [undefined];
     let stepsExecuted = 0;
+    const retries = config.retries ?? 0;
+    const concurrency = Math.min(config.concurrency ?? 1, 4);
 
-    for (const row of dataRows) {
-      const sessionId = `scenario-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`;
-      try {
-        const { state } = await this.sessionManager.startSession({
-          url: config.baseUrl ?? 'about:blank',
-          headless: config.headless ?? true,
-          device: config.device,
-          storageState: config.storageState,
-          sessionId,
-        });
-
-        for (const step of config.steps) {
-          stepsExecuted++;
-          await this.runStep(step, row, sessionId);
+    const runRow = async (row: Record<string, string | number> | undefined, rowIdx: number) => {
+      let lastErr: string | null = null;
+      for (let attempt = 0; attempt <= retries; attempt++) {
+        const sessionId = `scenario-${Date.now()}-${rowIdx}-${attempt}-${Math.random().toString(36).substring(2, 4)}`;
+        const vars: Record<string, string> = row ? Object.fromEntries(Object.entries(row).map(([k, v]) => [k, String(v)])) : {};
+        try {
+          await this.sessionManager.startSession({
+            url: config.baseUrl ?? 'about:blank',
+            headless: config.headless ?? true,
+            device: config.device,
+            browser: config.browser as never,
+            storageState: config.storageState,
+            sessionId,
+          });
+          if (config.beforeAll) for (const s of config.beforeAll) { stepsExecuted++; await this.runStep(s, vars, sessionId); }
+          for (const step of config.steps) {
+            stepsExecuted++;
+            await this.runStep(step, vars, sessionId);
+          }
+          if (config.afterAll) for (const s of config.afterAll) { stepsExecuted++; await this.runStep(s, vars, sessionId); }
+          const report = await this.sessionManager.generateReport({ title: config.name, outputPath: path.resolve(process.cwd(), 'test-reports', `${this.safeName(config.name)}${dataRows.length > 1 ? `-row${rowIdx}` : ''}.md`) }, sessionId);
+          if (report.report.status === 'FAILED') throw new Error(`${config.name}: report status FAILED (${report.report.issues.length} issues)`);
+          return; // success — no failure push
+        } catch (err: unknown) {
+          lastErr = err instanceof Error ? err.message : String(err);
+          if (attempt === retries) failures.push(lastErr);
+          else await new Promise((r) => setTimeout(r, 500 * (attempt + 1)));
+        } finally {
+          await this.sessionManager.closeSession(sessionId).catch(() => {});
         }
-
-        const report = await this.sessionManager.generateReport({ title: config.name, outputPath: path.resolve(process.cwd(), 'test-reports', `${this.safeName(config.name)}.md`) }, sessionId);
-        if (report.report.status === 'FAILED') {
-          failures.push(`${config.name}: report status FAILED`);
-        }
-      } catch (err: unknown) {
-        const msg = err instanceof Error ? err.message : String(err);
-        failures.push(msg);
-      } finally {
-        await this.sessionManager.closeSession(sessionId);
+        if (lastErr && attempt === retries) break;
+        if (!lastErr) break;
       }
+    };
+
+    if (concurrency > 1 && dataRows.length > 1) {
+      // Batched parallel execution
+      for (let i = 0; i < dataRows.length; i += concurrency) {
+        const batch = dataRows.slice(i, i + concurrency).map((row, bi) => runRow(row, i + bi));
+        await Promise.all(batch);
+      }
+    } else {
+      for (let idx = 0; idx < dataRows.length; idx++) await runRow(dataRows[idx], idx);
     }
 
-    return {
-      name: config.name,
-      passed: failures.length === 0,
-      stepsExecuted,
-      failures,
-    };
+    return { name: config.name, passed: failures.length === 0, stepsExecuted, failures };
   }
 
-  private async runStep(step: ScenarioStep, row: Record<string, string | number> | undefined, sessionId: string): Promise<void> {
+  private async runStep(step: ScenarioStep, vars: Record<string, string> | undefined, sessionId: string): Promise<void> {
     if (step.navigate) {
-      await this.sessionManager.executeAction({ type: 'navigate', value: this.interpolate(step.navigate, row) }, sessionId);
+      await this.sessionManager.executeAction({ type: 'navigate', value: this.interpolate(step.navigate, vars) }, sessionId);
       return;
     }
     if (step.mock) {
-      await this.sessionManager.executeAction({ type: 'navigate' } as never, sessionId); // noop placeholder
+      const driver = (this.sessionManager as unknown as { driver: { routeMock: (o: unknown) => Promise<void> } }).driver;
+      if (driver?.routeMock) {
+        await driver.routeMock({ urlPattern: this.interpolate(step.mock.urlPattern, vars), status: step.mock.status, body: step.mock.body, contentType: step.mock.contentType });
+      }
+      return;
+    }
+    if (step.mockReset) {
+      const driver = (this.sessionManager as unknown as { driver: { routeUnmock: (p?: string) => Promise<void> } }).driver;
+      if (driver?.routeUnmock) {
+        await driver.routeUnmock(step.mockReset.urlPattern ? this.interpolate(step.mockReset.urlPattern, vars) : undefined);
+      }
       return;
     }
     if (step.click !== undefined) {
-      const ref = typeof step.click === 'string' ? this.resolveRefAlias(step.click) : step.click;
+      const ref = typeof step.click === 'string' ? this.resolveRefAlias(String(this.interpolate(String(step.click), vars))) : step.click;
       await this.sessionManager.executeAction({ type: 'click', ref }, sessionId);
       return;
     }
     if (step.fill) {
-      const ref = typeof step.fill.ref === 'string' ? this.resolveRefAlias(step.fill.ref) : step.fill.ref;
-      await this.sessionManager.executeAction({ type: 'fill', ref, value: this.interpolate(String(step.fill.value), row) }, sessionId);
+      const ref = typeof step.fill.ref === 'string' ? this.resolveRefAlias(String(this.interpolate(String(step.fill.ref), vars))) : step.fill.ref;
+      await this.sessionManager.executeAction({ type: 'fill', ref, value: this.interpolate(String(step.fill.value), vars) }, sessionId);
       return;
     }
     if (step.hover !== undefined) {
-      const ref = typeof step.hover === 'string' ? this.resolveRefAlias(step.hover) : step.hover;
+      const ref = typeof step.hover === 'string' ? this.resolveRefAlias(String(this.interpolate(String(step.hover), vars))) : step.hover;
       await this.sessionManager.executeAction({ type: 'hover', ref }, sessionId);
       return;
     }
     if (step.press) {
-      await this.sessionManager.executeAction({ type: 'press', value: this.interpolate(step.press, row) }, sessionId);
+      await this.sessionManager.executeAction({ type: 'press', value: this.interpolate(step.press, vars) }, sessionId);
       return;
     }
     if (step.select) {
-      const ref = typeof step.select.ref === 'string' ? this.resolveRefAlias(step.select.ref) : step.select.ref;
-      await this.sessionManager.executeAction({ type: 'select', ref, value: step.select.value }, sessionId);
+      const ref = typeof step.select.ref === 'string' ? this.resolveRefAlias(String(this.interpolate(String(step.select.ref), vars))) : step.select.ref;
+      await this.sessionManager.executeAction({ type: 'select', ref, value: this.interpolate(step.select.value, vars) }, sessionId);
       return;
     }
     if (step.scroll !== undefined) {
-      await this.sessionManager.executeAction({ type: 'scroll', value: typeof step.scroll === 'number' ? String(step.scroll) : step.scroll }, sessionId);
+      await this.sessionManager.executeAction({ type: 'scroll', value: typeof step.scroll === 'number' ? String(step.scroll) : this.interpolate(String(step.scroll), vars) }, sessionId);
       return;
     }
     if (step.screenshot) {
-      await this.sessionManager.takeScreenshot(step.screenshot, false, sessionId);
+      await this.sessionManager.takeScreenshot(this.interpolate(step.screenshot, vars), false, sessionId);
       return;
     }
     if (step.assert) {
-      const ref = typeof step.assert.ref === 'string' ? this.resolveRefAlias(step.assert.ref) : step.assert.ref;
-      const res = await this.sessionManager.assert({
-        ref,
-        kind: step.assert.kind,
-        expected: step.assert.expected,
-        operator: step.assert.operator,
-        sessionId,
-      });
+      const ref = typeof step.assert.ref === 'string' ? this.resolveRefAlias(String(this.interpolate(String(step.assert.ref), vars))) : step.assert.ref;
+      const expected = typeof step.assert.expected === 'string' ? this.interpolate(step.assert.expected, vars) : step.assert.expected;
+      const res = await this.sessionManager.assert({ ref, kind: step.assert.kind, expected, operator: step.assert.operator, sessionId });
       if (!res.result.passed) throw new Error(`Assertion failed: ${res.result.message}`);
       return;
     }
@@ -150,15 +179,62 @@ export class ScenarioRunner {
       if (!res.result.passed) throw new Error(`Perf assertion failed: ${res.result.message}`);
       return;
     }
+    if (step.waitFor) {
+      const ref = step.waitFor.ref !== undefined ? (typeof step.waitFor.ref === 'string' ? this.resolveRefAlias(String(this.interpolate(String(step.waitFor.ref), vars))) : step.waitFor.ref) : undefined;
+      if (ref !== undefined) {
+        const driver = (this.sessionManager as unknown as { driver: { waitForSelector?: (r: number, s: string, t: number) => Promise<void> } }).driver;
+        await driver.waitForSelector?.(ref, step.waitFor!.state ?? 'visible', step.waitFor!.timeoutMs ?? 10000);
+      } else {
+        await new Promise((r) => setTimeout(r, step.waitFor!.timeoutMs ?? 1000));
+      }
+      return;
+    }
+    if (step.extract) {
+      const ref = step.extract.ref !== undefined ? (typeof step.extract.ref === 'string' ? this.resolveRefAlias(String(this.interpolate(String(step.extract.ref), vars))) : step.extract.ref as number) : undefined;
+      if (ref !== undefined) {
+        const driver = (this.sessionManager as unknown as { driver: { extractValue?: (r: number, a: string) => Promise<string> } }).driver;
+        const val = await driver.extractValue?.(ref, step.extract.attribute ?? 'text') ?? '';
+        if (vars) vars[step.extract.varName] = val;
+      }
+      return;
+    }
+    if (step.request) {
+      const driver = (this.sessionManager as unknown as { driver: { apiRequest?: (o: unknown) => Promise<{ status: number; body: string }> } }).driver;
+      const url = this.interpolate(step.request.url, vars);
+      const body = typeof step.request.body === 'string' ? this.interpolate(step.request.body, vars) : step.request.body;
+      const res = await driver.apiRequest?.({ method: step.request.method ?? 'GET', url, body, headers: step.request.headers });
+      if (step.request.expectStatus !== undefined && res && res.status !== step.request.expectStatus) {
+        throw new Error(`Request ${url} expected ${step.request.expectStatus} got ${res.status}: ${res.body.slice(0, 300)}`);
+      }
+      return;
+    }
     if (step.wait !== undefined) {
       await new Promise((r) => setTimeout(r, step.wait));
       return;
     }
   }
 
-  private interpolate(value: string, row?: Record<string, string | number>): string {
-    if (!row) return value;
-    return value.replace(/\{\{(\w+)\}\}/g, (_, key) => String(row[key] ?? `{{${key}}}`));
+  private interpolate(value: string, vars?: Record<string, string>): string {
+    if (!vars) return this.interpolateFaker(value);
+    let out = value.replace(/\{\{(\w+)\}\}/g, (_, key) => vars[key] ?? `{{${key}}}`);
+    return this.interpolateFaker(out);
+  }
+
+  private interpolateFaker(value: string): string {
+    // Light faker without deps: {{faker.email}}, {{faker.uuid}}, {{faker.int:1-100}}
+    return value.replace(/\{\{faker\.(\w+)(?::([^}]+))?\}\}/g, (_, kind: string, arg: string | undefined) => {
+      switch (kind) {
+        case 'email': return `test+${Math.random().toString(36).slice(2, 8)}@example.com`;
+        case 'uuid': return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+        case 'int': {
+          const m = arg?.match(/(\d+)-(\d+)/);
+          const lo = m ? parseInt(m[1]!, 10) : 0, hi = m ? parseInt(m[2]!, 10) : 100;
+          return String(Math.floor(Math.random() * (hi - lo + 1)) + lo);
+        }
+        case 'name': return `User${Math.random().toString(36).slice(2, 6)}`;
+        default: return `{{faker.${kind}}}`;
+      }
+    });
   }
 
   private resolveRefAlias(_alias: string): number {

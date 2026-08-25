@@ -1,0 +1,17 @@
+---
+title: CLI Overview
+description: ai-test commands.
+---
+
+| Command | Purpose |
+|---|---|
+| `ai-test open <url>` | Open + ARIA inspect |
+| `ai-test test <url>` | Health check → Markdown/HTML/JUnit + trace |
+| `ai-test crawl <url>` | Sitemap BFS + broken links |
+| `ai-test run <yaml>` | Scenario YAML (data-driven) |
+| `ai-test record <url>` | Record to YAML (experimental) |
+| `ai-test ui` | Dashboard on :3100 with SSE |
+| `ai-test serve-mcp` | MCP stdio server |
+| `ai-test init / uninstall` | Agent wiring |
+
+Global flags: `--allowed-hosts host1,host2`, `--verbose`, `--device`, `--storage-state`, `--browser chromium|firefox|webkit`.

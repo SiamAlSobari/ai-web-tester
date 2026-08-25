@@ -22,7 +22,7 @@ export function createMcpServer(sessionManager?: SessionManager, securityConfig?
 
   const server = new McpServer({
     name: 'ai-browser-testing',
-    version: '0.3.0',
+    version: '0.3.1',
   });
 
   server.tool(
@@ -366,6 +366,63 @@ export function createMcpServer(sessionManager?: SessionManager, securityConfig?
         const sessions = manager.listSessions();
         const text = sessions.length === 0 ? 'No active sessions.' : sessions.map((s) => `[${s.id}] ${s.url} (${s.status}, ${s.actions} actions, ${s.issues} issues)`).join('\n');
         return { content: [{ type: 'text', text: `📚 Active Sessions:\n${text}` }] };
+      } catch (err: unknown) {
+        return { isError: true, content: [{ type: 'text', text: `❌ ${err instanceof Error ? err.message : String(err)}` }] };
+      }
+    }
+  );
+
+  server.tool(
+    'browser_health',
+    'Health check: browser alive, version, pages, artifact usage.',
+    {},
+    async () => {
+      try {
+        const health = await (driver as unknown as { healthCheck?: () => Promise<unknown> }).healthCheck?.() ?? { alive: driver.isAlive() };
+        const sessions = manager.listSessions();
+        return { content: [{ type: 'text', text: `🏥 Health: ${JSON.stringify({ health, sessions: sessions.length }, null, 2)}` }] };
+      } catch (err: unknown) {
+        return { isError: true, content: [{ type: 'text', text: `❌ ${err instanceof Error ? err.message : String(err)}` }] };
+      }
+    }
+  );
+
+  server.tool(
+    'browser_wait_for',
+    'Waits for element [ref] to reach visible/hidden/attached/detached state.',
+    { ref: z.number(), state: z.enum(['visible', 'hidden', 'attached', 'detached']).optional().default('visible'), timeoutMs: z.number().optional().default(10000), sessionId: z.string().optional() },
+    async ({ ref, state, timeoutMs }) => {
+      try {
+        await (driver as unknown as { waitForSelector?: (r: number, s: string, t: number) => Promise<void> }).waitForSelector?.(ref, state, timeoutMs);
+        return { content: [{ type: 'text', text: `✅ [ref=${ref}] reached ${state}` }] };
+      } catch (err: unknown) {
+        return { isError: true, content: [{ type: 'text', text: `❌ waitFor failed: ${err instanceof Error ? err.message : String(err)}` }] };
+      }
+    }
+  );
+
+  server.tool(
+    'browser_extract',
+    'Extracts text/value/html/href from element [ref] for variable chaining.',
+    { ref: z.number(), attribute: z.enum(['text', 'value', 'html', 'href']).optional().default('text'), sessionId: z.string().optional() },
+    async ({ ref, attribute }) => {
+      try {
+        const val = await (driver as unknown as { extractValue?: (r: number, a: string) => Promise<string> }).extractValue?.(ref, attribute) ?? '';
+        return { content: [{ type: 'text', text: `📋 [ref=${ref}] ${attribute}="${val}"` }] };
+      } catch (err: unknown) {
+        return { isError: true, content: [{ type: 'text', text: `❌ extract failed: ${err instanceof Error ? err.message : String(err)}` }] };
+      }
+    }
+  );
+
+  server.tool(
+    'browser_live_screenshot',
+    'Returns live base64 screenshot for dashboards (no file write).',
+    { fullPage: z.boolean().optional().default(false) },
+    async ({ fullPage }) => {
+      try {
+        const b64 = await (driver as unknown as { captureScreenshotBase64?: (fp: boolean) => Promise<string> }).captureScreenshotBase64?.(fullPage) ?? '';
+        return { content: [{ type: 'text', text: `📸 LIVE_SCREENSHOT_BASE64:${b64.slice(0, 80)}... (${b64.length} chars)` }, { type: 'image', data: b64, mimeType: 'image/png' } as unknown as { type: 'text'; text: string }] };
       } catch (err: unknown) {
         return { isError: true, content: [{ type: 'text', text: `❌ ${err instanceof Error ? err.message : String(err)}` }] };
       }

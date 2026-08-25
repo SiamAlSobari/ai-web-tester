@@ -7,6 +7,7 @@ export interface CrawlOptions {
   maxDepth?: number;
   maxPages?: number;
   timeoutMs?: number;
+  securityConfig?: import('../../shared/config/security.js').SecurityConfig;
 }
 
 export class SitemapCrawler {
@@ -41,9 +42,28 @@ export class SitemapCrawler {
       this.driver.attachTelemetry?.(this.telemetry);
     }
 
+    // Try sitemap.xml first for broader coverage
+    if (maxDepth > 1) {
+      const sitemapUrls = await this.fetchSitemapUrls(rootUrl).catch(() => []);
+      for (const su of sitemapUrls) {
+        if (!visited.has(this.normalizeUrl(su)) && !queue.some((q) => this.normalizeUrl(q.url) === this.normalizeUrl(su))) {
+          try { if (new URL(su).origin === rootOrigin) queue.push({ url: su, depth: 1 }); } catch {}
+        }
+      }
+    }
+
     while (queue.length > 0 && visited.size < maxPages) {
       const current = queue.shift()!;
       const cleanUrl = this.normalizeUrl(current.url);
+      // SSRF guard per-hop
+      if (options?.securityConfig) {
+        const { isUrlAllowed } = await import('../../shared/config/security.js');
+        const check = isUrlAllowed(cleanUrl, options.securityConfig);
+        if (!check.allowed) {
+          brokenLinks.push({ url: cleanUrl, status: 403, foundOn: current.parentUrl || rootUrl, errorMsg: check.reason });
+          continue;
+        }
+      }
 
       if (visited.has(cleanUrl)) continue;
       visited.add(cleanUrl);
@@ -182,6 +202,20 @@ export class SitemapCrawler {
     } catch {
       return url;
     }
+  }
+
+  private async fetchSitemapUrls(rootUrl: string): Promise<string[]> {
+    try {
+      const sitemapUrl = new URL('/sitemap.xml', rootUrl).href;
+      const ctrl = new AbortController();
+      const t = setTimeout(() => ctrl.abort(), 5000);
+      const res = await fetch(sitemapUrl, { signal: ctrl.signal });
+      clearTimeout(t);
+      if (!res.ok) return [];
+      const xml = await res.text();
+      const matches = [...xml.matchAll(/<loc>(.*?)<\/loc>/g)];
+      return matches.map((m) => m[1]?.trim()).filter(Boolean) as string[];
+    } catch { return []; }
   }
 
   private async resolveStatus(url: string): Promise<number> {

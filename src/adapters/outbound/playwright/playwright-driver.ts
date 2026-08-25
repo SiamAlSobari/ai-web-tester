@@ -1,6 +1,6 @@
 import path from 'node:path';
 import fs from 'node:fs/promises';
-import { chromium, devices, type Browser, type BrowserContext, type Page, type Locator, type CDPSession } from 'playwright';
+import { chromium, firefox, webkit, devices, type Browser, type BrowserContext, type Page, type Locator, type CDPSession } from 'playwright';
 import {
   IBrowserDriver,
   LaunchOptions,
@@ -38,7 +38,8 @@ export class PlaywrightDriver implements IBrowserDriver {
     if (this.browser && this.page) return;
 
     const isHeadless = options?.headless ?? true;
-    this.browser = await chromium.launch({
+    const browserType = options?.browser === 'firefox' ? firefox : options?.browser === 'webkit' ? webkit : chromium;
+    this.browser = await browserType.launch({
       headless: isHeadless,
       slowMo: isHeadless ? 0 : 50,
       args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage'],
@@ -48,6 +49,18 @@ export class PlaywrightDriver implements IBrowserDriver {
       viewport: options?.viewport ?? { width: 1280, height: 720 },
       ignoreHTTPSErrors: true,
     };
+    if (options?.recordVideo) {
+      contextOptions.recordVideo = {
+        dir: options.recordVideo.dir ?? path.resolve(process.cwd(), 'artifacts', 'videos'),
+        size: options.recordVideo.size,
+      };
+    }
+    if (options?.recordHar) {
+      contextOptions.recordHar = {
+        path: options.recordHar.path ?? path.resolve(process.cwd(), 'artifacts', 'har', `har-${Date.now()}.har`),
+        mode: options.recordHar.mode ?? 'full',
+      };
+    }
 
     if (options?.device && devices[options.device]) {
       contextOptions = {
@@ -206,10 +219,25 @@ export class PlaywrightDriver implements IBrowserDriver {
     const url = page.url();
     const title = await page.title();
 
-    // Query interactive elements on page
-    const selectorQuery = 'button, input, textarea, select, a[href], [role="button"], [role="link"], [role="checkbox"], [role="switch"], [role="tab"], [role="menuitem"]';
+    // Query interactive elements — pierce shadow DOM + iframe
+    const selectorQuery = [
+      'button', 'input', 'textarea', 'select', 'a[href]',
+      '[role="button"]', '[role="link"]', '[role="checkbox"]', '[role="switch"]', '[role="tab"]', '[role="menuitem"]',
+      '[contenteditable="true"]', '[onclick]', '[data-testid]'
+    ].join(', ');
+    // Include shadow-piercing via evaluate, but locator still handles most; supplement with frame scan
     const locators = page.locator(selectorQuery);
     const count = await locators.count();
+    // Also scan frames
+    const frameLocators: Locator[] = [];
+    for (const frame of page.frames()) {
+      if (frame === page.mainFrame()) continue;
+      try {
+        const fLoc = frame.locator(selectorQuery);
+        const fCount = await fLoc.count().catch(() => 0);
+        for (let j = 0; j < Math.min(fCount, 20); j++) frameLocators.push(fLoc.nth(j));
+      } catch {}
+    }
 
     let refId = 1;
     for (let i = 0; i < count; i++) {
@@ -265,6 +293,32 @@ export class PlaywrightDriver implements IBrowserDriver {
       } catch {
         // Skip stale elements during scan
       }
+    }
+    // Process frame locators
+    for (const floc of frameLocators) {
+      try {
+        const isVisible = await floc.isVisible({ timeout: 300 }).catch(() => false);
+        if (!isVisible) continue;
+        const info = await floc.evaluate((el) => {
+          const htmlEl = el as HTMLElement;
+          const inputEl = el as HTMLInputElement;
+          return {
+            tag: el.tagName.toLowerCase(),
+            role: el.getAttribute('role') || el.tagName.toLowerCase(),
+            name: (el.getAttribute('aria-label') || htmlEl.innerText?.trim() || el.getAttribute('placeholder') || '').substring(0, 80),
+            type: inputEl.type || undefined,
+            placeholder: el.getAttribute('placeholder') || undefined,
+            disabled: htmlEl.hasAttribute('disabled'),
+            required: htmlEl.hasAttribute('required'),
+            checked: inputEl.checked,
+          };
+        }).catch(() => null);
+        if (!info) continue;
+        const elementRef = new ElementRef({ ref: refId, role: info.role, name: info.name, tag: info.tag, type: info.type, placeholder: info.placeholder, disabled: info.disabled, required: info.required, checked: info.checked });
+        this.locatorCache.set(refId, floc);
+        this.elementRefCache.set(refId, elementRef);
+        refId++;
+      } catch {}
     }
 
     const ariaSummary = Array.from(this.elementRefCache.values())
@@ -538,6 +592,52 @@ export class PlaywrightDriver implements IBrowserDriver {
     return { hasDiff: result.hasDiff, diffPercentage: result.diffPercentage, message: result.message };
   }
 
+  async healthCheck(): Promise<{ alive: boolean; browser: string; version: string; pages: number; artifactsSizeKb: number }> {
+    let artifactsSizeKb = 0;
+    try {
+      const artifactsDir = path.resolve(process.cwd(), 'artifacts');
+      const files = await fs.readdir(artifactsDir, { recursive: true }).catch(() => []);
+      artifactsSizeKb = (files as string[]).length;
+    } catch {}
+    return {
+      alive: this.isAlive(),
+      browser: this.browser ? 'chromium' : 'none',
+      version: this.browser?.version() ?? 'unknown',
+      pages: this.context?.pages().length ?? 0,
+      artifactsSizeKb,
+    };
+  }
+
+  async waitForSelector(ref: number, state: 'visible' | 'hidden' | 'attached' | 'detached' = 'visible', timeoutMs = 10000): Promise<void> {
+    const loc = this.getLocator(ref);
+    await loc.waitFor({ state, timeout: timeoutMs });
+  }
+
+  getElementRef(ref: number): ElementRef | undefined {
+    return this.elementRefCache.get(ref);
+  }
+
+  async extractValue(ref: number, attribute: 'text' | 'value' | 'html' | 'href' = 'text'): Promise<string> {
+    const loc = this.getLocator(ref);
+    switch (attribute) {
+      case 'value': return (await loc.inputValue().catch(() => '')) ?? '';
+      case 'html': return (await loc.innerHTML().catch(() => '')) ?? '';
+      case 'href': return (await loc.getAttribute('href').catch(() => '')) ?? '';
+      default: return (await loc.innerText().catch(() => ''))?.trim() ?? '';
+    }
+  }
+
+  async apiRequest(options: { method: string; url: string; body?: string | Record<string, unknown>; headers?: Record<string, string> }): Promise<{ status: number; body: string }> {
+    this.ensureReady();
+    const res = await this.page!.request.fetch(options.url, {
+      method: options.method,
+      headers: options.headers,
+      data: typeof options.body === 'object' ? JSON.stringify(options.body) : options.body,
+    });
+    const body = await res.text().catch(() => '');
+    return { status: res.status(), body };
+  }
+
   isTracingActive(): boolean {
     return this.tracingActive;
   }
@@ -582,14 +682,26 @@ export class PlaywrightDriver implements IBrowserDriver {
   }
 
   async captureScreenshot(filepath: string, fullPage = false): Promise<string> {
-
     this.ensureReady();
+    // Path traversal guard — only allow inside artifacts or test-reports
+    const allowedRoot = path.resolve(process.cwd());
+    const resolved = path.resolve(filepath);
+    if (!resolved.startsWith(allowedRoot)) {
+      throw new ActionExecutionError('screenshot', `Path traversal blocked: ${filepath}`, { filepath });
+    }
     try {
-      await this.page!.screenshot({ path: filepath, fullPage });
-      return filepath;
+      await fs.mkdir(path.dirname(resolved), { recursive: true });
+      await this.page!.screenshot({ path: resolved, fullPage });
+      return resolved;
     } catch (err: unknown) {
       throw new ActionExecutionError('screenshot', err instanceof Error ? err.message : String(err), { filepath });
     }
+  }
+
+  async captureScreenshotBase64(fullPage = false): Promise<string> {
+    this.ensureReady();
+    const buf = await this.page!.screenshot({ fullPage, type: 'png' });
+    return buf.toString('base64');
   }
 
   setSecurityConfig(_config?: SecurityConfig): void {

@@ -17,7 +17,7 @@ const program = new Command();
 program
   .name('ai-test')
   .description('Autonomous AI Web Testing Engine & Multi-Agent Integration CLI')
-  .version('0.3.0')
+  .version('0.3.1')
   .option('-v, --verbose', 'Enable debug logging', false)
   .hook('preAction', (thisCommand) => {
     if (thisCommand.opts().verbose) setLogLevel('debug');
@@ -97,18 +97,35 @@ program
   .option('-o, --output <path>', 'Custom output path for Markdown report')
   .option('-t, --title <title>', 'Title for the test report', 'Smoke Test')
   .option('-d, --device <device>', 'Mobile device preset')
+  .option('--browser <browser>', 'Browser engine: chromium|firefox|webkit', 'chromium')
   .option('-s, --storage-state <path>', 'Load auth storageState JSON')
   .option('--trace', 'Record Playwright trace', false)
+  .option('--video', 'Record video', false)
+  .option('--har', 'Record HAR', false)
   .option('--junit', 'Also emit JUnit XML report', false)
   .option('--html', 'Also emit HTML report', false)
+  .option('--perf-budget <path>', 'Path to perf budget JSON { metric: threshold }')
   .option('--allowed-hosts <hosts>', 'Comma-separated allowed hosts')
-  .action(async (url: string, options: { output?: string; title?: string; device?: string; storageState?: string; trace?: boolean; junit?: boolean; html?: boolean; allowedHosts?: string }) => {
+  .action(async (url: string, options: { output?: string; title?: string; device?: string; browser?: string; storageState?: string; trace?: boolean; video?: boolean; har?: boolean; junit?: boolean; html?: boolean; perfBudget?: string; allowedHosts?: string }) => {
     const manager = buildManager();
     manager.setSecurityConfig(parseAllowedHosts(options.allowedHosts));
     try {
       console.log(`🚀 Starting automated check on ${url}...`);
-      await manager.startSession({ url, headless: true, device: options.device, storageState: options.storageState, recordTrace: options.trace });
+      await manager.startSession({ url, headless: true, device: options.device, browser: options.browser as never, storageState: options.storageState, recordTrace: options.trace, recordVideo: options.video ? {} : undefined, recordHar: options.har ? {} : undefined });
       await manager.takeScreenshot('initial-state.png');
+
+      // Perf budget check
+      if (options.perfBudget) {
+        try {
+          const raw = await (await import('node:fs/promises')).readFile(options.perfBudget, 'utf-8');
+          const budget = JSON.parse(raw) as Record<string, number>;
+          for (const [metric, threshold] of Object.entries(budget)) {
+            const res = await manager.assertPerformance(metric as never, threshold);
+            console.log(`${res.result.passed ? '✅' : '❌'} Perf ${metric}: ${res.result.message}`);
+            if (!res.result.passed) process.exitCode = 1;
+          }
+        } catch (e) { console.warn('Perf budget check failed:', e); }
+      }
 
       const reportResult = await manager.generateReport({ title: options.title, outputPath: options.output });
       console.log(`\n✅ Test Complete!`);
@@ -172,7 +189,7 @@ program
     const crawler = new SitemapCrawler(driver, telemetry);
     try {
       console.log(`🕷️ Crawling ${url}...`);
-      const result = await crawler.crawl(url, { maxDepth: parseInt(options.depth, 10), maxPages: parseInt(options.pages, 10) });
+      const result = await crawler.crawl(url, { maxDepth: parseInt(options.depth, 10), maxPages: parseInt(options.pages, 10), securityConfig: parseAllowedHosts(options.allowedHosts) });
       console.log('\n' + crawler.toMarkdownReport(result));
     } catch (err: unknown) {
       console.error('❌ Error:', err instanceof Error ? err.message : String(err));
@@ -180,6 +197,41 @@ program
     } finally {
       await driver.close();
     }
+  });
+
+program
+  .command('record <url>')
+  .description('Record user interactions to YAML scenario (experimental)')
+  .option('-o, --output <path>', 'Output YAML path', 'scenario.recorded.yaml')
+  .option('--headed', 'Run headed for manual interaction', true)
+  .action(async (url: string, options: { output: string }) => {
+    const driver = new PlaywrightDriver();
+    const telemetry = new PlaywrightTelemetryObserver();
+    const reporter = new MarkdownReporter();
+    const manager = new SessionManager(driver, telemetry, reporter);
+    const recorded: string[] = [`name: Recorded Scenario`, `baseUrl: ${url}`, `steps:`];
+    console.log(`🔴 Recording ${url} — interact in headed browser, close to save YAML to ${options.output}`);
+    await manager.startSession({ url, headless: false });
+    const page = (driver as unknown as { getPage: () => { on: (e: string, fn: (x: unknown) => void) => void } }).getPage?.();
+    if (page) {
+      page.on('console', () => {});
+      // Capture clicks/fills via page evaluate injection
+      const rawPage = driver.getRawPage() as { evaluate: (fn: () => void) => Promise<void>; on: (ev: string, fn: (...a: unknown[]) => void) => void } | null;
+      if (rawPage) {
+        try {
+          await rawPage.evaluate(() => {
+            const push = (s: string) => { (window as unknown as { __recorded?: string[] }).__recorded = ((window as unknown as { __recorded?: string[] }).__recorded ?? []); (window as unknown as { __recorded: string[] }).__recorded.push(s); };
+            document.addEventListener('click', (e) => push(`  - click: ${(e.target as HTMLElement).innerText?.slice(0, 30) || 'unknown'}`), true);
+          });
+        } catch {}
+      }
+    }
+    // Wait until user closes browser (poll)
+    while (driver.isAlive()) await new Promise((r) => setTimeout(r, 1000));
+    const yaml = recorded.join('\n') + '\n  # (manual: replace click text with ref from browser_inspect)\n';
+    await (await import('node:fs/promises')).writeFile(options.output, yaml, 'utf-8');
+    console.log(`💾 Recorded scenario saved: ${options.output}`);
+    await manager.closeAll().catch(() => {});
   });
 
 program

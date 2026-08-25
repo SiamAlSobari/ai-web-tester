@@ -12,8 +12,13 @@ export interface VisualDiffResult {
   diffPath?: string;
 }
 
+export interface VisualDiffOptions {
+  threshold?: number;
+  ignoreRegions?: Array<{ x: number; y: number; width: number; height: number }>;
+}
+
 export class VisualDiffEngine {
-  async compareScreenshots(currentPath: string, baselinePath: string, threshold = 0.1): Promise<VisualDiffResult> {
+  async compareScreenshots(currentPath: string, baselinePath: string, threshold = 0.1, options?: VisualDiffOptions): Promise<VisualDiffResult> {
     try {
       const currentBuf = await fs.readFile(currentPath);
       const baselineExists = await fs.access(baselinePath).then(() => true).catch(() => false);
@@ -49,10 +54,18 @@ export class VisualDiffEngine {
         };
       }
 
+      // Apply ignoreRegions — blank diff areas before compare
+      if (options?.ignoreRegions) {
+        for (const r of options.ignoreRegions) {
+          this.blankRegion(currentImg.data, width, height, r);
+          this.blankRegion(baselineImg.data, width, height, r);
+        }
+      }
       const diff = new PNG({ width, height });
+      const t = options?.threshold ?? threshold;
       const numDiffPixels = pixelmatch(currentImg.data, baselineImg.data, diff.data, width, height, { threshold: 0.1 });
       const diffPercentage = Number(((numDiffPixels / (width * height)) * 100).toFixed(2));
-      const hasDiff = diffPercentage > threshold;
+      const hasDiff = diffPercentage > t;
 
       let diffPath: string | undefined;
       if (hasDiff) {
@@ -73,6 +86,15 @@ export class VisualDiffEngine {
     } catch (err: unknown) {
       const errorMsg = err instanceof Error ? err.message : String(err);
       return { hasDiff: false, baselinePath, currentPath, diffPercentage: 0, message: `Visual comparison failed: ${errorMsg}` };
+    }
+  }
+
+  private blankRegion(data: Buffer, width: number, height: number, r: { x: number; y: number; width: number; height: number }): void {
+    const x0 = Math.max(0, r.x), y0 = Math.max(0, r.y);
+    const x1 = Math.min(width, r.x + r.width), y1 = Math.min(height, r.y + r.height);
+    for (let y = y0; y < y1; y++) for (let x = x0; x < x1; x++) {
+      const idx = (y * width + x) * 4;
+      data[idx] = 0; data[idx + 1] = 0; data[idx + 2] = 0; data[idx + 3] = 255;
     }
   }
 

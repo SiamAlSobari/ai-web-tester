@@ -1,0 +1,10 @@
+---
+title: Assertions & Perf
+description: Assert state, not just act.
+---
+
+`browser_assert` kinds: `visible, hidden, exists, text, value, contains, enabled, disabled, checked, count` + operators `equals|contains|gte|lte|gt|lt|regex`.
+
+`browser_assert_perf` metrics: `fcp, load, ttfb, domContentLoaded` vs budget `lte|lt|gte|gt|equals`.
+
+Failures become `ASSERTION_FAILURE` issues in the report.

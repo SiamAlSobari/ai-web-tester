@@ -97,13 +97,15 @@ export class Action {
   }
 
   toJSON() {
+    const isPassword = this.targetDescription?.toLowerCase().includes('password') || this.type === 'fill' && this.targetDescription?.includes('type=password');
+    const maskedValue = isPassword && this.value ? '••••••••' : this.value;
     return {
       id: this.id,
       stepNumber: this.stepNumber,
       type: this.type,
       targetRef: this.targetRef,
       targetDescription: this.targetDescription,
-      value: this.value,
+      value: maskedValue,
       status: this.status,
       startedAt: this.startedAt,
       endedAt: this.endedAt,

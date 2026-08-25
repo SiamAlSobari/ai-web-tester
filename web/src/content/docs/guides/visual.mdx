@@ -1,0 +1,10 @@
+---
+title: Visual Regression
+description: Pixel diff with baselines.
+---
+
+```js
+await driver.compareScreenshot(current, baseline, 0.1, { ignoreRegions: [{x:0,y:0,width:200,height:80}] });
+```
+
+First run inits baseline; subsequent runs diff via `pixelmatch` + diff PNG under `artifacts/`. Exposed via `browser_screenshot({ compareBaseline, threshold })`.

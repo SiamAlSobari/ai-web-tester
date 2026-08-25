@@ -1,0 +1,45 @@
+---
+title: Test & Crawl
+description: Smoke tests and sitemaps.
+---
+
+## Test
+
+```bash
+ai-test test http://localhost:3000 --title "Smoke" --trace --video --har --junit --html --perf-budget perf.json
+```
+
+Perf budget example `perf.json`:
+
+```json
+{ "load": 3000, "fcp": 1800, "ttfb": 600 }
+```
+
+## Crawl
+
+```bash
+ai-test crawl http://localhost:3000 --depth 3 --pages 20 --allowed-hosts localhost
+```
+
+Uses `getCrawlData` via driver; skips asset noise (`png|jpg|css|woff`), supports `sitemap.xml` discovery.
+
+## Scenario
+
+```yaml
+name: Login flow
+baseUrl: http://localhost:3000/login
+browser: chromium
+retries: 1
+concurrency: 2
+data:
+  - { email: "a@test.com", pass: "secret" }
+steps:
+  - fill: { ref: 1, value: "{{email}}" }
+  - fill: { ref: 2, value: "{{pass}}" }
+  - click: 3
+  - assert: { ref: 3, kind: visible }
+  - extract: { varName: token, ref: 4, attribute: text }
+  - request: { method: GET, url: "http://localhost:3000/api/me", expectStatus: 200 }
+```
+
+Step kinds: `navigate, click, fill, hover, press, select, scroll, screenshot, assert, assertPerf, mock, mockReset, wait, waitFor, extract, request`.

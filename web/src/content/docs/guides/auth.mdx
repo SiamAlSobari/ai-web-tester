@@ -1,0 +1,11 @@
+---
+title: Auth & StorageState
+description: Reuse logins.
+---
+
+```js
+await manager.saveAuthState('./artifacts/auth/login.json');
+await manager.startSession({ url, storageState: './artifacts/auth/login.json' });
+```
+
+Via MCP: `browser_save_auth` then `browser_open({ storageState })`. Cookies + localStorage.
