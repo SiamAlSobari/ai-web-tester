@@ -34,6 +34,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit",
+    "build:web": "npm --prefix web run build",
+    "dev:web": "npm --prefix web run dev",
     "prepublishOnly": "npm run typecheck && npm run build && npm test"
   },
   "keywords": [
