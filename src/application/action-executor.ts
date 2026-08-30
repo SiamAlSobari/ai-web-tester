@@ -121,7 +121,13 @@ export class ActionExecutor {
             return;
           case 'select':
             if (params.ref === undefined) throw new Error('Ref ID required for select action');
-            await this.selfHealing(() => this.driver.selectOption(params.ref!, params.value ?? ''), params.ref);
+            await this.selfHealing(() => this.driver.selectOption(params.ref!, params.value ?? ''), params.ref, 'select', params.value);
+            return;
+          case 'fill_form':
+            if (this.driver.fillForm) {
+              const res = await this.driver.fillForm({ formRef: params.ref, mode: params.value === 'fuzz' ? 'fuzz' : 'valid' });
+              params.value = JSON.stringify(res.filledFields);
+            }
             return;
           case 'scroll':
             await this.driver.scroll(params.value || 'down', params.ref);
@@ -129,7 +135,7 @@ export class ActionExecutor {
           case 'upload':
             if (params.ref === undefined) throw new Error('Ref ID required for upload action');
             if (!params.filePaths || params.filePaths.length === 0) throw new Error('filePaths required for upload action');
-            await this.driver.uploadFile(params.ref, params.filePaths);
+            await this.selfHealing(() => this.driver.uploadFile(params.ref!, params.filePaths!), params.ref, 'upload', undefined, params.filePaths);
             return;
           case 'download':
             if (params.ref === undefined) throw new Error('Ref ID required for download trigger');
@@ -154,7 +160,6 @@ export class ActionExecutor {
         }
       } catch (err) {
         lastError = err;
-        // Self-healing already tried on final attempt; brief pause before retry
         if (attempt < maxRetries) {
           await new Promise((r) => setTimeout(r, 500));
         }
@@ -165,12 +170,17 @@ export class ActionExecutor {
   }
 
   /**
-   * Feature #9: Self-Healing Locator.
-   * On failure, fall back to re-scanning the page and trying role/text/selector
-   * based resolution before giving up. This reduces flakiness after dynamic
-   * re-renders where the cached ref locator went stale.
+   * Feature #9: Full-Spectrum Self-Healing Locator Engine.
+   * On failure, fall back to rich selector hierarchy (data-testid, id, name, text, aria-label)
+   * across all action types (click, fill, select, hover, upload).
    */
-  private async selfHealing(primary: () => Promise<void>, ref: number, primaryType?: string): Promise<void> {
+  private async selfHealing(
+    primary: () => Promise<void>,
+    ref: number,
+    primaryType?: string,
+    valParam?: string,
+    filePathsParam?: string[]
+  ): Promise<void> {
     try {
       await primary();
       return;
@@ -187,20 +197,28 @@ export class ActionExecutor {
               const loc = (page as any).locator(selector).first();
               await loc.waitFor({ state: 'visible', timeout: 3000 }).catch(() => {});
               await loc.scrollIntoViewIfNeeded({ timeout: 3000 }).catch(() => {});
-              // Dispatch by type instead of bind identity comparison
+
               if (primaryType === 'click') {
                 await loc.click({ timeout: 5000 });
                 return;
               } else if (primaryType === 'fill') {
-                // Fill via fallback locator directly
-                await loc.fill((elRef as { value?: string })?.value ?? '', { timeout: 5000 }).catch(async () => loc.click({ timeout: 2000 }).then(() => (page as { keyboard?: { type: (t: string) => Promise<void> } }).keyboard?.type('')));
+                const textToFill = valParam ?? (elRef as { value?: string })?.value ?? '';
+                await loc.fill(textToFill, { timeout: 5000 });
+                return;
+              } else if (primaryType === 'select') {
+                if (valParam) await loc.selectOption(valParam, { timeout: 5000 });
+                return;
+              } else if (primaryType === 'hover') {
+                await loc.hover({ timeout: 5000 });
+                return;
+              } else if (primaryType === 'upload' && filePathsParam) {
+                await loc.setInputFiles(filePathsParam, { timeout: 5000 });
                 return;
               }
-              await loc.click({ timeout: 3000 }).catch(() => {});
               await primary();
               return;
             } catch {
-              // try next selector
+              // try next fallback selector
             }
           }
         }
@@ -209,16 +227,28 @@ export class ActionExecutor {
     }
   }
 
-  private buildFallbackSelector(elRef: { role?: string; name?: string; tag?: string; type?: string }): string | null {
-    const list = this.buildFallbackSelectors(elRef);
-    return list[0] ?? null;
-  }
-
-  private buildFallbackSelectors(elRef: { role?: string; name?: string; tag?: string; type?: string; placeholder?: string }): string[] {
-    const name = elRef.name?.trim()?.slice(0, 40)?.replace(/"/g, '\\"');
+  private buildFallbackSelectors(elRef: {
+    role?: string;
+    name?: string;
+    tag?: string;
+    type?: string;
+    placeholder?: string;
+    testId?: string;
+    id?: string;
+    nameAttr?: string;
+  }): string[] {
     const selectors: string[] = [];
+    if (elRef.testId) {
+      selectors.push(`[data-testid="${elRef.testId}"]`, `[data-test="${elRef.testId}"]`, `[data-cy="${elRef.testId}"]`);
+    }
+    if (elRef.id) {
+      selectors.push(`#${elRef.id}`);
+    }
+    if (elRef.nameAttr) {
+      selectors.push(`[name="${elRef.nameAttr}"]`);
+    }
+    const name = elRef.name?.trim()?.slice(0, 40)?.replace(/"/g, '\\"');
     if (name) {
-      // Prefer getByRole semantics via CSS + :has-text
       if (elRef.role) selectors.push(`${elRef.role}:has-text("${name}")`);
       selectors.push(`text="${name}"`);
       selectors.push(`[aria-label="${name}"]`);

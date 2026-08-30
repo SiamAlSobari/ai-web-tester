@@ -49,8 +49,9 @@ npm -v    # Should output 10.x.x or newer
 Run the universal setup wizard directly using `npx`:
 
 ```bash
-npx ai-test init
+npx ai-web-tester init
 ```
+*(or `npx ai-test init`)*
 
 The wizard will prompt you to select your AI coding agent and installation scope (Global vs Workspace):
 ```text
@@ -75,22 +76,22 @@ You can bypass interactive prompts by passing the agent flag:
 
 ```bash
 # Setup for OpenCode
-npx ai-test init -a opencode
+npx ai-web-tester init -a opencode
 
 # Setup for Antigravity
-npx ai-test init -a antigravity
+npx ai-web-tester init -a antigravity
 
 # Setup for Claude Code
-npx ai-test init -a claude
+npx ai-web-tester init -a claude
 
 # Setup for Cursor
-npx ai-test init -a cursor
+npx ai-web-tester init -a cursor
 
 # Setup for Windsurf
-npx ai-test init -a windsurf
+npx ai-web-tester init -a windsurf
 
 # Setup for ALL agents at once
-npx ai-test init -a antigravity opencode claude cursor windsurf
+npx ai-web-tester init -a antigravity opencode claude cursor windsurf
 ```
 
 ### Method 3: Global NPM Installation
@@ -219,13 +220,19 @@ Now you can execute `ai-test` anywhere in your terminal pointing to your local s
 
 ## 🗑️ Clean Uninstallation (Removing MCP & Skills)
 
-If you ever need to remove `ai-web-tester` MCP server and skills from your AI coding agents:
+If you ever need to completely remove `ai-web-tester` MCP server configurations and autonomous skills from your AI coding agents, choose the method matching your environment:
 
-### 1. Interactive Uninstaller Wizard
+### 👤 Method 1: For End-Users (via NPX — No Repository Clone Required)
+
+You do **not** need the repository source code. Simply run from any terminal:
+
+#### A. Interactive Wizard
 ```bash
-npx ai-test uninstall
+npx ai-web-tester uninstall
 ```
-Select the agent you want to clean up:
+*(or `npx ai-test uninstall`)*
+
+Select the agents you wish to clean up:
 ```text
 🗑️  AI Web Testing — Uninstaller Wizard
 ==========================================
@@ -238,16 +245,65 @@ Select the AI Agent(s) you wish to uninstall (Remove MCP & Skills):
   A. All Agents
 ```
 
-
-### 2. Direct Uninstaller via Flags
+#### B. Direct Flag Execution (Non-interactive)
 ```bash
-# Remove from specific agent
-npx ai-test uninstall -a opencode
+# Remove from ALL agents at once (Global)
+npx ai-web-tester uninstall -a antigravity opencode claude cursor windsurf
 
-# Remove from ALL agents at once
-npx ai-test uninstall -a antigravity opencode claude cursor windsurf
+# Remove from a specific agent
+npx ai-web-tester uninstall -a antigravity
+npx ai-web-tester uninstall -a opencode
+npx ai-web-tester uninstall -a claude
+npx ai-web-tester uninstall -a cursor
+npx ai-web-tester uninstall -a windsurf
+
+# If installed in a local workspace project instead of global config:
+npx ai-web-tester uninstall -a antigravity --local
 ```
-This cleanly deletes the generated skill directories (`web-test`, `web-test-all`, `web-test-fix`) and removes `ai-browser-testing` entries from the agent configuration files without affecting other tools.
+
+---
+
+### 📦 Method 2: For Globally-Installed NPM Package
+
+If you previously installed `ai-web-tester` globally via `npm install -g ai-web-tester`:
+
+```bash
+# Step 1: Remove MCP server configurations and skills from agents
+ai-test uninstall -a antigravity opencode claude cursor windsurf
+
+# Step 2: Remove the global npm package from your computer
+npm uninstall -g ai-web-tester
+```
+
+---
+
+### 💻 Method 3: For Local Developers (Inside Cloned Repository)
+
+If you are inside the cloned `ai-web-tester` project directory:
+
+```bash
+# Unlink local binary (if linked via npm link)
+npm unlink -g ai-web-tester
+
+# Run uninstaller from source build
+node dist/cli.js uninstall -a antigravity opencode claude cursor windsurf
+```
+
+---
+
+### 🛠️ Method 4: Complete Manual Cleanup (No Node.js Required)
+
+If you prefer to remove configs and skills manually:
+
+| Agent | 1. Remove MCP Server Config (delete key `"ai-browser-testing"`) | 2. Remove Skills (delete `web-test*` folders) |
+| :--- | :--- | :--- |
+| **Google Antigravity** | `~/.gemini/config/mcp_config.json` | `~/.gemini/config/skills/` |
+| **OpenCode** | `~/.config/opencode/config.json` *(or `%APPDATA%\opencode\config.json`)* | `~/.config/opencode/skills/` |
+| **Claude Code / Desktop** | `%APPDATA%\Claude\claude_desktop_config.json` *(Win)* / `~/Library/Application Support/Claude/...` *(Mac)* | `~/.claude/skills/` |
+| **Cursor** | `~/.cursor/mcp.json` | `~/.cursor/rules/` |
+| **Windsurf / Roo Code** | `~/.codeium/windsurf/mcp_config.json` | `~/.codeium/windsurf/skills/` |
+
+This completely restores your AI agent configurations to their original state without affecting other tools or skills.
 
 ---
 

@@ -187,6 +187,46 @@ export class SessionManager {
     return { filepath };
   }
 
+  async fillForm(options?: { formRef?: number; mode?: 'valid' | 'fuzz'; overrides?: Record<string, string> }, sessionId?: string): Promise<{ result: { filledFields: Record<string, string>; message: string }; state: PageState; llmContext: string }> {
+    const session = this.getSession(sessionId);
+    const fillResult = await this.driver.fillForm?.(options) ?? { filledFields: {}, message: 'fillForm not supported' };
+    const stateExtractor = this.stateExtractors.get(sessionId || this.activeSessionId!)!;
+    const state = await stateExtractor.extractCurrentState();
+    session.updateState(state);
+    return { result: fillResult, state, llmContext: `${fillResult.message}\n\n${state.toLLMContext()}` };
+  }
+
+  async generateScenario(name = 'Generated Scenario', sessionId?: string): Promise<{ yaml: string; filepath?: string }> {
+    const session = this.getSession(sessionId);
+    const steps: Array<Record<string, unknown>> = [];
+
+    for (const a of session.actions) {
+      if (a.type === 'navigate' && a.value) steps.push({ navigate: a.value });
+      else if (a.type === 'click' && a.targetRef !== undefined) steps.push({ click: a.targetRef });
+      else if (a.type === 'fill' && a.targetRef !== undefined) steps.push({ fill: { ref: a.targetRef, value: a.value ?? '' } });
+      else if (a.type === 'select' && a.targetRef !== undefined) steps.push({ select: { ref: a.targetRef, value: a.value ?? '' } });
+      else if (a.type === 'hover' && a.targetRef !== undefined) steps.push({ hover: a.targetRef });
+      else if (a.type === 'press' && a.value) steps.push({ press: a.value });
+      else if (a.type === 'scroll') steps.push({ scroll: a.value || 'down' });
+      else if (a.type === 'screenshot') steps.push({ screenshot: `step-${a.stepNumber}` });
+    }
+
+    const scenarioObj = {
+      name,
+      baseUrl: session.targetUrl,
+      headless: true,
+      steps,
+    };
+
+    const yamlModule = await import('js-yaml');
+    const yamlStr = yamlModule.dump(scenarioObj);
+    const targetDir = path.resolve(process.cwd(), 'scenarios');
+    await fs.mkdir(targetDir, { recursive: true });
+    const targetFile = path.join(targetDir, `${name.toLowerCase().replace(/[^a-z0-9]/g, '_')}.yaml`);
+    await fs.writeFile(targetFile, yamlStr, 'utf-8');
+    return { yaml: yamlStr, filepath: targetFile };
+  }
+
   async generateReport(options?: BuildReportOptions, sessionId?: string): Promise<BuildReportResult> {
     const session = this.getSession(sessionId);
     const reportBuilder = new ReportBuilder(this.reporter);

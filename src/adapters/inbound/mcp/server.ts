@@ -22,7 +22,7 @@ export function createMcpServer(sessionManager?: SessionManager, securityConfig?
 
   const server = new McpServer({
     name: 'ai-browser-testing',
-    version: '0.3.1',
+    version: '0.3.2',
   });
 
   server.tool(
@@ -425,6 +425,42 @@ export function createMcpServer(sessionManager?: SessionManager, securityConfig?
         return { content: [{ type: 'text', text: `📸 LIVE_SCREENSHOT_BASE64:${b64.slice(0, 80)}... (${b64.length} chars)` }, { type: 'image', data: b64, mimeType: 'image/png' } as unknown as { type: 'text'; text: string }] };
       } catch (err: unknown) {
         return { isError: true, content: [{ type: 'text', text: `❌ ${err instanceof Error ? err.message : String(err)}` }] };
+      }
+    }
+  );
+
+  server.tool(
+    'browser_fill_form',
+    'Smart Form Auto-Filler & Fuzzer — automatically analyzes and fills all inputs in a form.',
+    {
+      formRef: z.number().optional().describe('Target form element ref (optional, fills active form)'),
+      mode: z.enum(['valid', 'fuzz']).optional().default('valid').describe('Mode: "valid" for realistic test data or "fuzz" for boundary/injection security testing'),
+      overrides: z.record(z.string()).optional().describe('Custom field overrides { fieldName: value }'),
+      sessionId: z.string().optional(),
+    },
+    async ({ formRef, mode, overrides, sessionId }) => {
+      try {
+        const res = await manager.fillForm({ formRef, mode, overrides }, sessionId);
+        return { content: [{ type: 'text', text: res.llmContext }] };
+      } catch (err: unknown) {
+        return { isError: true, content: [{ type: 'text', text: `❌ fill_form failed: ${err instanceof Error ? err.message : String(err)}` }] };
+      }
+    }
+  );
+
+  server.tool(
+    'browser_generate_scenario',
+    'Auto-generates a replayable YAML scenario file from the active session.',
+    {
+      name: z.string().optional().default('Generated Scenario'),
+      sessionId: z.string().optional(),
+    },
+    async ({ name, sessionId }) => {
+      try {
+        const res = await manager.generateScenario(name, sessionId);
+        return { content: [{ type: 'text', text: `📄 Scenario generated:\nFile: ${res.filepath}\n\n\`\`\`yaml\n${res.yaml}\n\`\`\`` }] };
+      } catch (err: unknown) {
+        return { isError: true, content: [{ type: 'text', text: `❌ generate_scenario failed: ${err instanceof Error ? err.message : String(err)}` }] };
       }
     }
   );

@@ -1,6 +1,6 @@
 {
   "name": "ai-web-tester",
-  "version": "0.3.1",
+  "version": "0.3.2",
   "description": "Autonomous browser testing engine & MCP toolset for AI coding agents",
   "repository": {
     "type": "git",
@@ -14,6 +14,7 @@
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "bin": {
+    "ai-web-tester": "dist/cli.js",
     "ai-test": "dist/cli.js",
     "ai-test-mcp": "dist/mcp.js"
   },

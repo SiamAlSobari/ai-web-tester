@@ -8,10 +8,12 @@ export class PlaywrightTelemetryObserver implements ITelemetryObserver {
 
   private readonly onConsole = (msg: ConsoleMessage) => {
     const type = msg.type();
+    const text = msg.text();
     if (type === 'error' || type === 'warning') {
-      const issueType: IssueType = type === 'error' ? 'CONSOLE_ERROR' : 'WARNING';
+      const isSecurity = text.includes('Content Security Policy') || text.includes('CORS') || text.includes('blocked by CORS') || text.includes('Refused to connect');
+      const issueType: IssueType = isSecurity ? 'SECURITY_WARNING' : type === 'error' ? 'CONSOLE_ERROR' : 'WARNING';
       this.issues.push(
-        Issue.create(issueType, `[Browser Console ${type.toUpperCase()}] ${msg.text()}`, this.attachedPage?.url() ?? '', {
+        Issue.create(issueType, `[Browser Console ${type.toUpperCase()}] ${text}`, this.attachedPage?.url() ?? '', {
           stack: msg.location() ? `${msg.location().url}:${msg.location().lineNumber}:${msg.location().columnNumber}` : undefined,
         })
       );
@@ -31,6 +33,21 @@ export class PlaywrightTelemetryObserver implements ITelemetryObserver {
     const resourceType = res.request().resourceType();
     const url = res.url();
     const lowerUrl = url.toLowerCase();
+
+    // Check slow API performance (>2000ms)
+    try {
+      const timing = res.request().timing();
+      if (timing && timing.responseEnd > 2000 && (resourceType === 'fetch' || resourceType === 'xhr' || resourceType === 'document')) {
+        this.issues.push(
+          Issue.create(
+            'SLOW_NETWORK_WARNING',
+            `[Slow Network Request ${Math.round(timing.responseEnd)}ms] ${res.request().method()} ${url}`,
+            this.attachedPage?.url() ?? '',
+            { details: { durationMs: Math.round(timing.responseEnd), status, url, resourceType } }
+          )
+        );
+      }
+    } catch {}
 
     // Feature #8: Filter telemetry noise — only capture meaningful failures.
     const isNoise =
@@ -56,7 +73,12 @@ export class PlaywrightTelemetryObserver implements ITelemetryObserver {
     try {
       const text = await res.text();
       if (text) {
-        bodyPreview = text.length > 500 ? text.substring(0, 500) + '... [truncated]' : text;
+        try {
+          const parsedJson = JSON.parse(text);
+          bodyPreview = JSON.stringify(parsedJson, null, 2);
+        } catch {
+          bodyPreview = text.length > 500 ? text.substring(0, 500) + '... [truncated]' : text;
+        }
       }
     } catch {
       // Body might be binary or already consumed
@@ -84,9 +106,11 @@ export class PlaywrightTelemetryObserver implements ITelemetryObserver {
   private readonly onRequestFailed = (req: Request) => {
     const failure = req.failure();
     const errorText = failure?.errorText ?? 'Request failed';
+    const isSecurity = errorText.includes('CORS') || errorText.includes('ERR_BLOCKED_BY_CSP') || errorText.includes('ERR_CERT');
+    const issueType: IssueType = isSecurity ? 'SECURITY_WARNING' : 'NETWORK_FAILURE';
     this.issues.push(
       Issue.create(
-        'NETWORK_FAILURE',
+        issueType,
         `[Fetch / Network Failed] ${req.method()} ${req.url()} (${errorText})`,
         this.attachedPage?.url() ?? '',
         {

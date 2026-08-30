@@ -7,21 +7,23 @@ Transport `stdio` via `dist/mcp.js`. Security: `allowedHosts` + `blockPrivateNet
 
 | Tool | Params | Desc |
 |---|---|---|
-| browser_open | url, headless, device, browser, storageState, networkProfile, recordTrace/Video/Har | Launch + ARIA |
-| browser_act | action, ref, value, filePaths | Interaction with retry + self-healing |
-| browser_inspect | — | Refresh state |
-| browser_switch_tab | tabIndex | Multi-tab |
-| browser_save_auth | path | JSON cookies |
-| browser_audit_a11y | — | axe-core |
-| browser_crawl | url, maxDepth, maxPages | Sitemap |
-| browser_screenshot | name, fullPage, compareBaseline, threshold | + visual diff |
-| browser_report | title, outputPath | Markdown |
-| browser_report_junit/html | outputPath | CI |
-| browser_run_scenario | path | YAML |
-| browser_sessions | — | List |
-| browser_assert | kind, ref, expected, operator | 10 kinds |
-| browser_assert_perf | metric, thresholdMs, operator | Web Vitals |
+| browser_open | url, headless, device, browser, storageState, replayHar, networkProfile, recordTrace/Video/Har | Launch + ARIA |
+| browser_act | action, ref, value, filePaths, screenshotName | Interaction with full-spectrum self-healing |
+| browser_fill_form | formRef, mode ('valid'/'fuzz'), overrides | Smart Form Auto-Filler & Security Fuzzer |
+| browser_generate_scenario | name | Auto-generates replayable YAML scenario |
+| browser_inspect | — | Refresh state + in-viewport badges |
+| browser_switch_tab | tabIndex | Multi-tab & popup switching |
+| browser_save_auth | path | JSON cookies & localStorage |
+| browser_audit_a11y | — | axe-core WCAG 2.1 AA audit |
+| browser_crawl | url, maxDepth, maxPages | Deep crawling + form structure discovery |
+| browser_screenshot | name, fullPage, compareBaseline, threshold | Capture + visual regression diffing |
+| browser_report | title, outputPath | Markdown generation |
+| browser_report_junit/html | outputPath | CI/CD test reports |
+| browser_run_scenario | path | YAML scenario runner |
+| browser_sessions | — | List active browser contexts |
+| browser_assert | kind, ref, expected, operator, timeoutMs | 10 assertion kinds with timeout |
+| browser_assert_perf | metric, thresholdMs, operator | Web Vitals budget enforcement |
 | browser_mock / mock_reset | urlPattern, status, body | Route mocking |
-| browser_health | — | alive/version/pages |
-| browser_wait_for / extract / live_screenshot | — | Ergonomics |
-| browser_close | sessionId | Teardown |
+| browser_health | — | alive/version/pages health probe |
+| browser_wait_for / extract / live_screenshot | — | Ergonomics & base64 preview |
+| browser_close | sessionId | Teardown & memory cleanup |

@@ -3,8 +3,22 @@ title: Scenario Runner
 description: YAML replay + data-driven + mocks.
 ---
 
-Features: `beforeAll`/`afterAll`, `retries`, `concurrency` (≤4), `{{var}}` interpolation + `{{faker.email|uuid|int:1-100|name}}`, `mock`/`mockReset` via `routeMock`, `waitFor`, `extract` chaining.
+Features:
+- **Hooks Lifecycle**: `beforeAll`, `afterAll`, `beforeEach`, and `afterEach` per data row.
+- **Environment Interpolation**: `${{ env.VAR_NAME }}` from system environment variables.
+- **Smart Form Auto-Fill**: `fill_form: { mode: 'valid' | 'fuzz' }` step directly in YAML.
+- **Data-driven Rows**: `data:` array with variable interpolation `{{var}}` + faker helpers `{{faker.email|uuid|int:1-100|name}}`.
+- **Network Mocks**: `mock`/`mockReset` via `routeMock`.
+- **Chaining & Extraction**: `waitFor`, `extract`, `assert`, and `request`.
 
-Run: `ai-test run ./scenario.yaml` or via MCP `browser_run_scenario`.
+Run via CLI:
+```bash
+ai-test run ./scenario.yaml
+```
 
-Reports per row: `test-reports/<name>-rowN.md`.
+Or auto-generate from any live URL:
+```bash
+ai-test generate https://example.com --output scenarios/my-flow.yaml
+```
+
+Reports generated per row: `test-reports/<name>-rowN.md`.

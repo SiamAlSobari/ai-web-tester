@@ -1,7 +1,7 @@
 /**
  * Represents an issue, error, or anomaly detected during web testing.
  */
-export type IssueType = 'CONSOLE_ERROR' | 'PAGE_CRASH' | 'NETWORK_FAILURE' | 'ASSERTION_FAILURE' | 'WARNING';
+export type IssueType = 'CONSOLE_ERROR' | 'PAGE_CRASH' | 'NETWORK_FAILURE' | 'ASSERTION_FAILURE' | 'WARNING' | 'SECURITY_WARNING' | 'SLOW_NETWORK_WARNING';
 
 export interface IssueProps {
   id: string;

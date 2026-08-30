@@ -13,12 +13,14 @@ export interface LaunchOptions {
   recordTrace?: boolean;
   recordVideo?: { dir?: string; size?: { width: number; height: number } };
   recordHar?: { path?: string; mode?: 'full' | 'minimal' };
+  replayHar?: string;
 }
 
 export interface CrawlPageData {
   title: string;
   hrefs: string[];
   forms: number;
+  formsDetail?: Array<{ action: string; method: string; inputs: string[] }>;
 }
 
 export interface MockRouteOptions {
@@ -95,6 +97,7 @@ export interface IBrowserDriver {
   extractValue?(ref: number, attribute: 'text' | 'value' | 'html' | 'href'): Promise<string>;
   apiRequest?(options: { method: string; url: string; body?: string | Record<string, unknown>; headers?: Record<string, string> }): Promise<{ status: number; body: string }>;
   getElementRef?(ref: number): import('../value-objects/element-ref.vo.js').ElementRef | undefined;
+  fillForm?(options?: { formRef?: number; mode?: 'valid' | 'fuzz'; overrides?: Record<string, string> }): Promise<{ filledFields: Record<string, string>; message: string }>;
 }
 
 

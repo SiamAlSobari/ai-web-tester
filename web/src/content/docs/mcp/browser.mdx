@@ -3,8 +3,15 @@ title: Browser Control
 description: Open, act, inspect, tabs, auth.
 ---
 
-`browser_open` launches `chromium|firefox|webkit`, device presets (iPhone 15 etc), viewport, networkProfile `None|Fast 3G|Slow 3G|Offline`, trace/video/HAR.
+`browser_open` launches `chromium|firefox|webkit`, device presets (iPhone 15 etc), viewport, networkProfile `None|Fast 3G|Slow 3G|Offline`, `replayHar`, trace/video/HAR.
+ 
+`browser_act` actions: `click, fill, hover, press, select, scroll, upload, download, switch_tab, screenshot` with deterministic `ref` and **Full-Spectrum Self-Healing** fallbacks (`data-testid` > `#id` > `name` > fuzzy text).
 
-`browser_act` actions: `click, fill, hover, press, select, scroll, upload, download, switch_tab, screenshot` with `ref` deterministic.
+`browser_fill_form` analyzes all form inputs and auto-populates them:
+- `mode: 'valid'` fills realistic emails, passwords, phone numbers, names, and dates.
+- `mode: 'fuzz'` injects boundary testing and XSS / SQLi payloads.
+- `overrides: { fieldName: "custom" }` allows precise overrides.
+
+`browser_generate_scenario` exports the active session actions into a replayable YAML test scenario.
 
 `browser_save_auth` persists `storageState` JSON; pass it back to `browser_open`.

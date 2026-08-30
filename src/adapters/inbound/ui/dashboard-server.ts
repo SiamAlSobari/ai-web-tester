@@ -216,6 +216,15 @@ export class DashboardServer {
       </div>
     </div>
 
+    <div style="display: flex; gap: 12px; margin-bottom: 16px; align-items: center;">
+      <input type="text" id="search-input" placeholder="🔍 Search reports by title / filename..." oninput="renderList()" style="flex: 1; background: var(--card-bg); border: 1px solid var(--border); border-radius: 8px; padding: 10px 14px; color: #f8fafc; font-family: 'JetBrains Mono', monospace; font-size: 13px;" />
+      <select id="status-filter" onchange="renderList()" style="background: var(--card-bg); border: 1px solid var(--border); border-radius: 8px; padding: 10px 14px; color: #f8fafc; font-family: 'JetBrains Mono', monospace; font-size: 13px;">
+        <option value="ALL">All Reports</option>
+        <option value="PASSED">Passed Only</option>
+        <option value="FAILED">Failed Only</option>
+      </select>
+    </div>
+
     <div class="main-grid">
       <div class="report-list" id="report-list">
         <div style="padding: 20px; text-align: center; color: var(--text-muted); font-size: 13px;">Loading reports...</div>
@@ -261,35 +270,58 @@ export class DashboardServer {
 
     function renderList() {
       const listEl = document.getElementById('report-list');
-      if (reportsData.length === 0) {
-        listEl.innerHTML = '<div style="padding: 20px; text-align: center; color: var(--text-muted); font-size: 13px;">No reports found in ./test-reports/</div>';
+      const query = (document.getElementById('search-input')?.value || '').toLowerCase();
+      const statusFilter = document.getElementById('status-filter')?.value || 'ALL';
+
+      const filtered = reportsData.filter(r => {
+        const isPassed = r.content.includes('status: "PASSED"') || r.content.includes('[PASS]');
+        if (statusFilter === 'PASSED' && !isPassed) return false;
+        if (statusFilter === 'FAILED' && isPassed) return false;
+        if (query && !r.filename.toLowerCase().includes(query) && !r.content.toLowerCase().includes(query)) return false;
+        return true;
+      });
+
+      if (filtered.length === 0) {
+        listEl.innerHTML = '<div style="padding: 20px; text-align: center; color: var(--text-muted); font-size: 13px;">No matching reports found.</div>';
         return;
       }
-      listEl.innerHTML = reportsData.map((r, idx) => {
+      listEl.innerHTML = filtered.map((r, idx) => {
         const isPassed = r.content.includes('status: "PASSED"') || r.content.includes('[PASS]');
         const badgeClass = isPassed ? 'badge-passed' : 'badge-failed';
         const badgeText = isPassed ? 'PASSED' : 'FAILED';
         return \`
-          <div class="report-item" onclick="viewReport(\${idx})">
+          <div class="report-item" onclick="viewFilteredReport('\${r.filename}')">
             <span class="badge \${badgeClass}">\${badgeText}</span>
             <div class="report-title">\${r.filename}</div>
             <div class="report-meta">\${new Date(r.modifiedAt).toLocaleString()}</div>
           </div>
         \`;
       }).join('');
-      if (reportsData.length > 0) {
-        viewReport(0);
+      if (filtered.length > 0) {
+        viewFilteredReport(filtered[0].filename);
       }
     }
 
-    function viewReport(idx) {
+    function viewFilteredReport(filename) {
       const items = document.querySelectorAll('.report-item');
-      items.forEach((it, i) => it.classList.toggle('active', i === idx));
-      const report = reportsData[idx];
+      const report = reportsData.find(r => r.filename === filename);
       if (report) {
         document.getElementById('report-viewer').innerText = report.content;
       }
     }
+
+    // Connect SSE live event stream
+    try {
+      const sse = new EventSource('/api/events');
+      sse.onmessage = (e) => {
+        try {
+          const ev = JSON.parse(e.data);
+          if (ev.type === 'report:generated' || ev.type === 'action:executed') {
+            loadReports();
+          }
+        } catch {}
+      };
+    } catch {}
 
     loadReports();
   </script>

@@ -81,6 +81,10 @@ export class PlaywrightDriver implements IBrowserDriver {
       ? { width: (contextOptions.viewport as { width: number }).width, height: (contextOptions.viewport as { height: number }).height }
       : (deviceViewport as { width: number; height: number } | undefined) ?? { width: 1280, height: 720 };
 
+    if (options?.replayHar) {
+      await this.context.routeFromHAR(options.replayHar, { notFound: 'fallback' }).catch(() => {});
+    }
+
     if (options?.recordTrace) {
       await this.context.tracing.start({ screenshots: true, snapshots: true, sources: true });
       this.tracingActive = true;
@@ -249,15 +253,32 @@ export class PlaywrightDriver implements IBrowserDriver {
         const info = await loc.evaluate((el) => {
           const htmlEl = el as HTMLElement;
           const inputEl = el as HTMLInputElement;
+          const selectEl = el as HTMLSelectElement;
 
           const role = el.getAttribute('role') || el.tagName.toLowerCase();
-          const name =
+          const svgTitle = el.querySelector('svg title')?.textContent?.trim() || el.querySelector('svg')?.getAttribute('aria-label') || '';
+          const tooltip = el.getAttribute('title') || el.getAttribute('data-tooltip') || el.getAttribute('aria-description') || '';
+          
+          let name =
             el.getAttribute('aria-label') ||
             htmlEl.innerText?.trim() ||
+            svgTitle ||
+            tooltip ||
             el.getAttribute('placeholder') ||
             el.getAttribute('name') ||
-            el.getAttribute('title') ||
+            el.getAttribute('id') ||
             '';
+
+          // Options for select element
+          let options: string[] | undefined;
+          if (el.tagName.toLowerCase() === 'select' && selectEl.options) {
+            options = Array.from(selectEl.options).map((o) => (o.text || o.value).trim()).filter(Boolean);
+          }
+
+          // Check if currently inside visible viewport
+          const rect = el.getBoundingClientRect();
+          const vHeight = window.innerHeight || document.documentElement.clientHeight || 720;
+          const inViewport = rect.top < vHeight && rect.bottom > 0;
 
           return {
             tag: el.tagName.toLowerCase(),
@@ -269,6 +290,12 @@ export class PlaywrightDriver implements IBrowserDriver {
             disabled: htmlEl.hasAttribute('disabled') || el.getAttribute('aria-disabled') === 'true',
             required: htmlEl.hasAttribute('required') || el.getAttribute('aria-required') === 'true',
             checked: inputEl.checked !== undefined ? inputEl.checked : undefined,
+            inViewport,
+            options,
+            testId: el.getAttribute('data-testid') || el.getAttribute('data-test') || el.getAttribute('data-cy') || undefined,
+            id: el.id || undefined,
+            nameAttr: el.getAttribute('name') || undefined,
+            tooltip: tooltip || undefined,
           };
         }).catch(() => null);
 
@@ -285,6 +312,12 @@ export class PlaywrightDriver implements IBrowserDriver {
           disabled: info.disabled,
           required: info.required,
           checked: info.checked,
+          inViewport: info.inViewport,
+          options: info.options,
+          testId: info.testId,
+          id: info.id,
+          nameAttr: info.nameAttr,
+          tooltip: info.tooltip,
         });
 
         this.locatorCache.set(refId, loc);
@@ -302,19 +335,51 @@ export class PlaywrightDriver implements IBrowserDriver {
         const info = await floc.evaluate((el) => {
           const htmlEl = el as HTMLElement;
           const inputEl = el as HTMLInputElement;
+          const selectEl = el as HTMLSelectElement;
+          const svgTitle = el.querySelector('svg title')?.textContent?.trim() || el.querySelector('svg')?.getAttribute('aria-label') || '';
+          const tooltip = el.getAttribute('title') || el.getAttribute('data-tooltip') || '';
+          const name = (el.getAttribute('aria-label') || htmlEl.innerText?.trim() || svgTitle || tooltip || el.getAttribute('placeholder') || '').substring(0, 80);
+          let options: string[] | undefined;
+          if (el.tagName.toLowerCase() === 'select' && selectEl.options) {
+            options = Array.from(selectEl.options).map((o) => (o.text || o.value).trim()).filter(Boolean);
+          }
+          const rect = el.getBoundingClientRect();
+          const inViewport = rect.top < (window.innerHeight || 720) && rect.bottom > 0;
           return {
             tag: el.tagName.toLowerCase(),
             role: el.getAttribute('role') || el.tagName.toLowerCase(),
-            name: (el.getAttribute('aria-label') || htmlEl.innerText?.trim() || el.getAttribute('placeholder') || '').substring(0, 80),
+            name,
             type: inputEl.type || undefined,
             placeholder: el.getAttribute('placeholder') || undefined,
             disabled: htmlEl.hasAttribute('disabled'),
             required: htmlEl.hasAttribute('required'),
             checked: inputEl.checked,
+            inViewport,
+            options,
+            testId: el.getAttribute('data-testid') || el.getAttribute('data-test') || el.getAttribute('data-cy') || undefined,
+            id: el.id || undefined,
+            nameAttr: el.getAttribute('name') || undefined,
+            tooltip: tooltip || undefined,
           };
         }).catch(() => null);
         if (!info) continue;
-        const elementRef = new ElementRef({ ref: refId, role: info.role, name: info.name, tag: info.tag, type: info.type, placeholder: info.placeholder, disabled: info.disabled, required: info.required, checked: info.checked });
+        const elementRef = new ElementRef({
+          ref: refId,
+          role: info.role,
+          name: info.name,
+          tag: info.tag,
+          type: info.type,
+          placeholder: info.placeholder,
+          disabled: info.disabled,
+          required: info.required,
+          checked: info.checked,
+          inViewport: info.inViewport,
+          options: info.options,
+          testId: info.testId,
+          id: info.id,
+          nameAttr: info.nameAttr,
+          tooltip: info.tooltip,
+        });
         this.locatorCache.set(refId, floc);
         this.elementRefCache.set(refId, elementRef);
         refId++;
@@ -582,9 +647,115 @@ export class PlaywrightDriver implements IBrowserDriver {
     return this.page!.evaluate(() => {
       const anchors = Array.from(document.querySelectorAll<HTMLAnchorElement>('a[href]'));
       const hrefs = anchors.map((a) => a.href).filter((h) => h.startsWith('http'));
-      const forms = document.querySelectorAll('form').length;
-      return { title: document.title, hrefs, forms };
+      const forms = Array.from(document.querySelectorAll<HTMLFormElement>('form'));
+      const formsDetail = forms.map((f) => {
+        const inputs = Array.from(f.querySelectorAll<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>('input, textarea, select'))
+          .map((i) => i.name || i.id || i.getAttribute('placeholder') || i.type || 'field')
+          .filter(Boolean);
+        return {
+          action: f.action || '',
+          method: (f.method || 'GET').toUpperCase(),
+          inputs,
+        };
+      });
+      return { title: document.title, hrefs, forms: forms.length, formsDetail };
     });
+  }
+
+  /**
+   * Smart Form Auto-Filler & Fuzzing engine.
+   * Analyzes form fields, detects semantics (email, phone, name, password, date),
+   * and auto-fills values accordingly.
+   */
+  async fillForm(options?: { formRef?: number; mode?: 'valid' | 'fuzz'; overrides?: Record<string, string> }): Promise<{ filledFields: Record<string, string>; message: string }> {
+    this.ensureReady();
+    const mode = options?.mode ?? 'valid';
+    const overrides = options?.overrides ?? {};
+    const filled: Record<string, string> = {};
+
+    const page = this.page!;
+    const inputs = page.locator('form input, form textarea, form select, input:not([type="hidden"]), textarea, select');
+    const count = await inputs.count();
+
+    for (let i = 0; i < count; i++) {
+      const field = inputs.nth(i);
+      try {
+        const isVis = await field.isVisible({ timeout: 200 }).catch(() => false);
+        if (!isVis) continue;
+
+        const info = await field.evaluate((el) => {
+          const input = el as HTMLInputElement;
+          const select = el as HTMLSelectElement;
+          return {
+            tag: el.tagName.toLowerCase(),
+            type: (input.type || 'text').toLowerCase(),
+            name: input.name || input.id || input.getAttribute('placeholder') || '',
+            disabled: input.disabled || input.readOnly,
+            options: select.options ? Array.from(select.options).map((o) => o.value || o.text) : [],
+          };
+        }).catch(() => null);
+
+        if (!info || info.disabled) continue;
+        if (info.type === 'submit' || info.type === 'button' || info.type === 'image' || info.type === 'reset') continue;
+
+        const key = info.name || `field_${i + 1}`;
+        let valueToFill = overrides[key] ?? '';
+
+        if (!valueToFill) {
+          const lower = key.toLowerCase();
+          if (info.type === 'checkbox') {
+            const shouldCheck = mode === 'valid';
+            if (shouldCheck) await field.check({ timeout: 1000 }).catch(() => {});
+            else await field.uncheck({ timeout: 1000 }).catch(() => {});
+            filled[key] = shouldCheck ? 'checked' : 'unchecked';
+            continue;
+          }
+
+          if (info.tag === 'select') {
+            const firstOpt = info.options.find((o) => o && o !== '') || info.options[0];
+            if (firstOpt) {
+              await field.selectOption(firstOpt, { timeout: 1000 }).catch(() => {});
+              filled[key] = firstOpt;
+            }
+            continue;
+          }
+
+          if (info.type === 'email' || lower.includes('email')) {
+            valueToFill = mode === 'fuzz' ? '<script>alert("xss")</script>' : `test.${Date.now().toString(36)}@example.com`;
+          } else if (info.type === 'password' || lower.includes('pass')) {
+            valueToFill = mode === 'fuzz' ? '' : 'P@ssw0rd123!Secure';
+          } else if (info.type === 'tel' || lower.includes('phone') || lower.includes('mobile')) {
+            valueToFill = mode === 'fuzz' ? 'not-a-phone-number-00000000000000000000' : '+12025550199';
+          } else if (info.type === 'number' || lower.includes('age') || lower.includes('qty') || lower.includes('amount')) {
+            valueToFill = mode === 'fuzz' ? '-999999' : '42';
+          } else if (info.type === 'date' || lower.includes('date') || lower.includes('dob') || lower.includes('birth')) {
+            valueToFill = mode === 'fuzz' ? '9999-99-99' : '2000-01-15';
+          } else if (lower.includes('name') || lower.includes('user') || lower.includes('author')) {
+            valueToFill = mode === 'fuzz' ? 'A'.repeat(300) : 'Jane Doe QA Tester';
+          } else if (lower.includes('search') || lower.includes('query') || lower.includes('q')) {
+            valueToFill = mode === 'fuzz' ? "' OR '1'='1' --" : 'Test Query Automation';
+          } else if (lower.includes('url') || lower.includes('website') || lower.includes('link')) {
+            valueToFill = mode === 'fuzz' ? 'javascript:void(0)' : 'https://example.com';
+          } else if (info.tag === 'textarea' || lower.includes('message') || lower.includes('comment') || lower.includes('bio') || lower.includes('desc')) {
+            valueToFill = mode === 'fuzz' ? '<h1>fuzz_injection</h1>'.repeat(10) : 'This is an automated test message for form validation verification.';
+          } else {
+            valueToFill = mode === 'fuzz' ? '<img src=x onerror=alert(1)>' : 'Automated QA Value';
+          }
+        }
+
+        await field.fill(valueToFill, { timeout: 2000 }).catch(async () => {
+          await field.click({ timeout: 1000 }).catch(() => {});
+          await page.keyboard.type(valueToFill).catch(() => {});
+        });
+        filled[key] = valueToFill;
+      } catch {
+        // Continue filling next field
+      }
+    }
+
+    const fieldCount = Object.keys(filled).length;
+    const msg = `Auto-filled ${fieldCount} form fields in [${mode.toUpperCase()}] mode.`;
+    return { filledFields: filled, message: msg };
   }
 
   async compareScreenshot(currentPath: string, baselinePath: string, threshold?: number): Promise<{ hasDiff: boolean; diffPercentage: number; message: string }> {

@@ -1,3 +1,9 @@
+export interface CrawlFormInfo {
+  action: string;
+  method: string;
+  inputs: string[];
+}
+
 export interface CrawlNode {
   url: string;
   pathname: string;
@@ -7,6 +13,7 @@ export interface CrawlNode {
   parentUrl?: string;
   links: string[];
   formsCount: number;
+  forms?: CrawlFormInfo[];
   errorCount: number;
 }
 

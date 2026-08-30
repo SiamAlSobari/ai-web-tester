@@ -2,6 +2,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import os from 'node:os';
 import readline from 'node:readline';
+import { fileURLToPath } from 'node:url';
 
 export type SupportedAgent = 'antigravity' | 'opencode' | 'claude' | 'cursor' | 'windsurf';
 
@@ -98,7 +99,22 @@ export class AgentInstaller {
   constructor(projectRoot = process.cwd(), homeDir = os.homedir()) {
     this.projectRoot = path.resolve(projectRoot);
     this.homeDir = homeDir;
-    this.mcpExecutablePath = path.join(this.projectRoot, 'dist', 'mcp.js').replace(/\\/g, '/');
+
+    let mcpPath: string;
+    try {
+      const currentDir = path.dirname(fileURLToPath(import.meta.url));
+      if (projectRoot !== process.cwd()) {
+        mcpPath = path.join(this.projectRoot, 'dist', 'mcp.js');
+      } else if (path.basename(currentDir) === 'dist') {
+        mcpPath = path.join(currentDir, 'mcp.js');
+      } else {
+        mcpPath = path.join(this.projectRoot, 'dist', 'mcp.js');
+      }
+    } catch {
+      mcpPath = path.join(this.projectRoot, 'dist', 'mcp.js');
+    }
+
+    this.mcpExecutablePath = mcpPath.replace(/\\/g, '/');
   }
 
   async installForAgents(agents: SupportedAgent[], isGlobal = true): Promise<{ installed: string[]; errors: string[] }> {

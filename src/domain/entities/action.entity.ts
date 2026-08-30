@@ -1,7 +1,7 @@
 /**
  * Represents an action executed on the browser during a test run.
  */
-export type ActionType = 'navigate' | 'click' | 'fill' | 'hover' | 'press' | 'select' | 'scroll' | 'upload' | 'download' | 'switch_tab' | 'screenshot';
+export type ActionType = 'navigate' | 'click' | 'fill' | 'fill_form' | 'hover' | 'press' | 'select' | 'scroll' | 'upload' | 'download' | 'switch_tab' | 'screenshot';
 export type ActionStatus = 'PENDING' | 'PASSED' | 'FAILED';
 
 export interface ActionProps {

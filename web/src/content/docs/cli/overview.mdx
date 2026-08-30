@@ -5,13 +5,16 @@ description: ai-test commands.
 
 | Command | Purpose |
 |---|---|
-| `ai-test open <url>` | Open + ARIA inspect |
-| `ai-test test <url>` | Health check → Markdown/HTML/JUnit + trace |
-| `ai-test crawl <url>` | Sitemap BFS + broken links |
-| `ai-test run <yaml>` | Scenario YAML (data-driven) |
-| `ai-test record <url>` | Record to YAML (experimental) |
-| `ai-test ui` | Dashboard on :3100 with SSE |
-| `ai-test serve-mcp` | MCP stdio server |
-| `ai-test init / uninstall` | Agent wiring |
+| `ai-test doctor` | Diagnose environment, browser binaries & agent configs |
+| `ai-test repl` | Interactive QA terminal shell for real-time exploratory testing |
+| `ai-test generate <url>` | Auto-generate replayable YAML test scenario from URL |
+| `ai-test open <url>` | Open URL + ARIA DOM inspect |
+| `ai-test test <url>` | Health check → Markdown/HTML/JUnit + trace + HAR replay |
+| `ai-test crawl <url>` | Authenticated sitemap BFS + deep form discovery |
+| `ai-test run <yaml>` | Scenario YAML runner (data-driven + hooks) |
+| `ai-test record <url>` | Record user interactions to YAML |
+| `ai-test ui` | Web Dashboard on :3100 with live SSE feed + search/filter |
+| `ai-test serve-mcp` | Run Model Context Protocol (MCP) stdio server |
+| `ai-test init / uninstall` | Multi-agent configuration setup & removal |
 
-Global flags: `--allowed-hosts host1,host2`, `--verbose`, `--device`, `--storage-state`, `--browser chromium|firefox|webkit`.
+Global flags: `--allowed-hosts host1,host2`, `--verbose`, `--device`, `--storage-state`, `--replay-har <path>`, `--github-summary`, `--browser chromium|firefox|webkit`.

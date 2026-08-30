@@ -9,12 +9,13 @@ export interface ScenarioStep {
   navigate?: string;
   click?: number | string;
   fill?: { ref: number | string; value: string | number };
+  fill_form?: { formRef?: number | string; mode?: 'valid' | 'fuzz'; overrides?: Record<string, string> };
   hover?: number | string;
   press?: string;
   select?: { ref: number | string; value: string };
   scroll?: string | number;
   screenshot?: string;
-  assert?: { ref?: number | string; kind: AssertionKind; expected?: string | number | boolean; operator?: ComparisonOperator };
+  assert?: { ref?: number | string; kind: AssertionKind; expected?: string | number | boolean; operator?: ComparisonOperator; timeoutMs?: number };
   assertPerf?: { metric: 'fcp' | 'load' | 'ttfb' | 'domContentLoaded' | 'dcl'; thresholdMs: number; operator?: 'lte' | 'lt' | 'gte' | 'gt' | 'equals' };
   mock?: { urlPattern: string; status?: number; body?: string | Record<string, unknown>; contentType?: string };
   mockReset?: { urlPattern?: string };
@@ -23,6 +24,7 @@ export interface ScenarioStep {
   extract?: { varName: string; ref?: number | string; attribute?: 'text' | 'value' | 'html' | 'href' };
   request?: { method?: string; url: string; body?: string | Record<string, unknown>; headers?: Record<string, string>; expectStatus?: number };
   retry?: { attempts?: number };
+  timeoutMs?: number;
 }
 
 export interface ScenarioConfig {
@@ -37,6 +39,8 @@ export interface ScenarioConfig {
   concurrency?: number;
   beforeAll?: ScenarioStep[];
   afterAll?: ScenarioStep[];
+  beforeEach?: ScenarioStep[];
+  afterEach?: ScenarioStep[];
   steps: ScenarioStep[];
 }
 
@@ -83,10 +87,12 @@ export class ScenarioRunner {
             sessionId,
           });
           if (config.beforeAll) for (const s of config.beforeAll) { stepsExecuted++; await this.runStep(s, vars, sessionId); }
+          if (config.beforeEach) for (const s of config.beforeEach) { stepsExecuted++; await this.runStep(s, vars, sessionId); }
           for (const step of config.steps) {
             stepsExecuted++;
             await this.runStep(step, vars, sessionId);
           }
+          if (config.afterEach) for (const s of config.afterEach) { stepsExecuted++; await this.runStep(s, vars, sessionId); }
           if (config.afterAll) for (const s of config.afterAll) { stepsExecuted++; await this.runStep(s, vars, sessionId); }
           const report = await this.sessionManager.generateReport({ title: config.name, outputPath: path.resolve(process.cwd(), 'test-reports', `${this.safeName(config.name)}${dataRows.length > 1 ? `-row${rowIdx}` : ''}.md`) }, sessionId);
           if (report.report.status === 'FAILED') throw new Error(`${config.name}: report status FAILED (${report.report.issues.length} issues)`);
@@ -119,6 +125,11 @@ export class ScenarioRunner {
   private async runStep(step: ScenarioStep, vars: Record<string, string> | undefined, sessionId: string): Promise<void> {
     if (step.navigate) {
       await this.sessionManager.executeAction({ type: 'navigate', value: this.interpolate(step.navigate, vars) }, sessionId);
+      return;
+    }
+    if (step.fill_form) {
+      const formRef = typeof step.fill_form.formRef === 'string' ? this.resolveRefAlias(String(this.interpolate(String(step.fill_form.formRef), vars))) : step.fill_form.formRef;
+      await this.sessionManager.executeAction({ type: 'fill_form', ref: formRef, value: step.fill_form.mode ?? 'valid' }, sessionId);
       return;
     }
     if (step.mock) {
@@ -170,7 +181,7 @@ export class ScenarioRunner {
     if (step.assert) {
       const ref = typeof step.assert.ref === 'string' ? this.resolveRefAlias(String(this.interpolate(String(step.assert.ref), vars))) : step.assert.ref;
       const expected = typeof step.assert.expected === 'string' ? this.interpolate(step.assert.expected, vars) : step.assert.expected;
-      const res = await this.sessionManager.assert({ ref, kind: step.assert.kind, expected, operator: step.assert.operator, sessionId });
+      const res = await this.sessionManager.assert({ ref, kind: step.assert.kind, expected, operator: step.assert.operator, timeoutMs: step.assert.timeoutMs, sessionId });
       if (!res.result.passed) throw new Error(`Assertion failed: ${res.result.message}`);
       return;
     }
@@ -215,8 +226,16 @@ export class ScenarioRunner {
   }
 
   private interpolate(value: string, vars?: Record<string, string>): string {
-    if (!vars) return this.interpolateFaker(value);
-    let out = value.replace(/\{\{(\w+)\}\}/g, (_, key) => vars[key] ?? `{{${key}}}`);
+    // 1. Process ${{ env.VAR_NAME }} and {{env.VAR_NAME}}
+    let out = value.replace(/\$\{\{\s*env\.(\w+)\s*\}\}/g, (_, key) => process.env[key] ?? '')
+                   .replace(/\{\{\s*env\.(\w+)\s*\}\}/g, (_, key) => process.env[key] ?? '');
+
+    // 2. Process variable rows {{key}}
+    if (vars) {
+      out = out.replace(/\{\{(\w+)\}\}/g, (_, key) => vars[key] ?? `{{${key}}}`);
+    }
+
+    // 3. Process faker placeholders
     return this.interpolateFaker(out);
   }
 

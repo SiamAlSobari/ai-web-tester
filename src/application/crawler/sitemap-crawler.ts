@@ -7,6 +7,8 @@ export interface CrawlOptions {
   maxDepth?: number;
   maxPages?: number;
   timeoutMs?: number;
+  storageState?: string;
+  concurrency?: number;
   securityConfig?: import('../../shared/config/security.js').SecurityConfig;
 }
 
@@ -34,7 +36,7 @@ export class SitemapCrawler {
     ];
 
     if (!this.driver.isAlive()) {
-      await this.driver.launch({ headless: true });
+      await this.driver.launch({ headless: true, storageState: options?.storageState });
     }
 
     // Feature #3: Hexagonal decoupling — attach telemetry via interface
@@ -74,6 +76,7 @@ export class SitemapCrawler {
         let title = '';
         let pageLinks: string[] = [];
         let formsCount = 0;
+        let formsDetail: import('../../domain/entities/crawler.entity.js').CrawlFormInfo[] | undefined;
         let statusCode = 200;
 
         // Feature #6: Use interface method for crawl data (decoupled from Playwright)
@@ -82,6 +85,7 @@ export class SitemapCrawler {
           title = crawlData.title;
           pageLinks = crawlData.hrefs;
           formsCount = crawlData.forms;
+          formsDetail = crawlData.formsDetail;
         } else if (this.driver instanceof PlaywrightDriver) {
           // Fallback for drivers that don't implement getCrawlData
           const page = (this.driver as unknown as { getPage?: () => unknown }).getPage?.() as { title: () => Promise<string>; evaluate: (fn: () => unknown) => Promise<{ hrefs: string[]; forms: number }> } | null;
@@ -112,6 +116,7 @@ export class SitemapCrawler {
           parentUrl: current.parentUrl,
           links: pageLinks,
           formsCount,
+          forms: formsDetail,
           errorCount: statusCode >= 400 ? 1 : 0,
         };
 
