@@ -1,5 +1,6 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
+import { pathToFileURL } from 'node:url';
 import { IReporter } from '../../../domain/interfaces/reporter.interface.js';
 import { TestReport } from '../../../domain/entities/test-report.entity.js';
 import { ReportGenerationError } from '../../../shared/errors/domain-errors.js';
@@ -89,7 +90,7 @@ export class MarkdownReporter implements IReporter {
         const actionType = `\`${a.type.toUpperCase()}\``;
         const val = a.value ? `\`"${a.value}"\`` : '-';
         const errNote = a.error ? `<br><span style="color:red">🔴 <i>${a.error}</i></span>` : '';
-        const shotLink = a.screenshotPath ? `<br>📸 [Lihat Screenshot Error](file:///${path.resolve(a.screenshotPath).replace(/\\/g, '/')})` : '';
+        const shotLink = a.screenshotPath ? `<br>📸 [Lihat Screenshot Error](${pathToFileURL(path.resolve(a.screenshotPath)).href})` : '';
 
         return `| **#${a.stepNumber}** | ${actionType} | ${target} | ${val} | ${icon} ${errNote} ${shotLink} |`;
       });
@@ -168,9 +169,9 @@ export class MarkdownReporter implements IReporter {
     let screenshotsSection = '';
     if (r.screenshots.length > 0) {
       const rows = r.screenshots.map((s, idx) => {
-        const cleanPath = path.resolve(s).replace(/\\/g, '/');
+        const fileUrl = pathToFileURL(path.resolve(s)).href;
         const filename = path.basename(s);
-        return `| **#${idx + 1}** | 🔴 Bukti Anomali / Error | \`${filename}\` | [📸 Buka File Gambar](file:///${cleanPath}) |`;
+        return `| **#${idx + 1}** | 🔴 Bukti Anomali / Error | \`${filename}\` | [📸 Buka File Gambar](${fileUrl}) |`;
       });
 
       screenshotsSection = [

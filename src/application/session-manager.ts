@@ -1,11 +1,12 @@
 import path from 'node:path';
 import fs from 'node:fs/promises';
-import { IBrowserDriver, LaunchOptions } from '../domain/interfaces/browser-driver.interface.js';
-import { ITelemetryObserver } from '../domain/interfaces/telemetry-observer.interface.js';
+import { IBrowserDriver, LaunchOptions, MockRouteOptions } from '../domain/interfaces/browser-driver.interface.js';
+import { ITelemetryObserver, ConsoleLogEntry, NetworkLogEntry } from '../domain/interfaces/telemetry-observer.interface.js';
 import { IReporter } from '../domain/interfaces/reporter.interface.js';
 import { Session } from '../domain/entities/session.entity.js';
 import { PageState } from '../domain/entities/page-state.entity.js';
 import { Issue } from '../domain/entities/issue.entity.js';
+import { A11yAuditResult } from '../domain/entities/a11y.entity.js';
 import { StateExtractor } from './state-extractor.js';
 import { ActionExecutor, ExecuteActionParams, ExecuteActionResult } from './action-executor.js';
 import { ReportBuilder, BuildReportOptions, BuildReportResult } from './report-builder.js';
@@ -276,5 +277,65 @@ export class SessionManager {
     } catch {
       return null;
     }
+  }
+
+  getDriver(): IBrowserDriver {
+    return this.driver;
+  }
+
+  getTelemetry(): ITelemetryObserver {
+    return this.telemetry;
+  }
+
+  async compareScreenshot(currentPath: string, baselinePath: string, threshold?: number): Promise<{ hasDiff: boolean; diffPercentage: number; message: string }> {
+    if (this.driver.compareScreenshot) {
+      return this.driver.compareScreenshot(currentPath, baselinePath, threshold);
+    }
+    return { hasDiff: false, diffPercentage: 0, message: 'Driver does not support screenshot comparison.' };
+  }
+
+  async routeMock(options: MockRouteOptions, sessionId?: string): Promise<void> {
+    this.getSession(sessionId);
+    await this.driver.routeMock?.(options);
+  }
+
+  async routeUnmock(urlPattern?: string, sessionId?: string): Promise<void> {
+    this.getSession(sessionId);
+    await this.driver.routeUnmock?.(urlPattern);
+  }
+
+  async auditA11y(sessionId?: string): Promise<A11yAuditResult> {
+    this.getSession(sessionId);
+    if (!this.driver.auditA11y) {
+      throw new Error('Accessibility audit is not supported by driver.');
+    }
+    return this.driver.auditA11y();
+  }
+
+  async healthCheck(): Promise<unknown> {
+    return (await this.driver.healthCheck?.()) ?? { alive: this.driver.isAlive() };
+  }
+
+  async waitForSelector(ref: number, state?: 'visible' | 'hidden' | 'attached' | 'detached', timeoutMs?: number, sessionId?: string): Promise<void> {
+    this.getSession(sessionId);
+    await this.driver.waitForSelector?.(ref, state ?? 'visible', timeoutMs);
+  }
+
+  async extractValue(ref: number, attribute?: 'text' | 'value' | 'html' | 'href', sessionId?: string): Promise<string> {
+    this.getSession(sessionId);
+    return (await this.driver.extractValue?.(ref, attribute ?? 'text')) ?? '';
+  }
+
+  async captureScreenshotBase64(fullPage?: boolean, sessionId?: string): Promise<string> {
+    this.getSession(sessionId);
+    return (await this.driver.captureScreenshotBase64?.(fullPage)) ?? '';
+  }
+
+  getConsoleLogs(limit = 50, _sessionId?: string): ConsoleLogEntry[] {
+    return this.telemetry.getConsoleLogs?.(limit) ?? [];
+  }
+
+  getNetworkLogs(limit = 50, _sessionId?: string): NetworkLogEntry[] {
+    return this.telemetry.getNetworkLogs?.(limit) ?? [];
   }
 }

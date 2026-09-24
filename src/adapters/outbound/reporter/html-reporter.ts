@@ -1,5 +1,6 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
+import { pathToFileURL } from 'node:url';
 import { IReporter } from '../../../domain/interfaces/reporter.interface.js';
 import { TestReport } from '../../../domain/entities/test-report.entity.js';
 import { ReportGenerationError } from '../../../shared/errors/domain-errors.js';
@@ -32,7 +33,7 @@ export class HtmlReporter implements IReporter {
       .map((a) => {
         const color = a.status === 'PASSED' ? '#4ade80' : a.status === 'FAILED' ? '#f87171' : '#94a3b8';
         const err = a.error ? `<div style="color:#f87171;font-size:11px;margin-top:4px">⚠️ ${this.esc(a.error)}</div>` : '';
-        const shot = a.screenshotPath ? `<div style="margin-top:4px"><a href="file:///${this.esc(a.screenshotPath.replace(/\\/g, '/'))}" target="_blank" style="color:#38bdf8;font-size:11px">📸 View Screenshot</a></div>` : '';
+        const shot = a.screenshotPath ? `<div style="margin-top:4px"><a href="${this.esc(pathToFileURL(path.resolve(a.screenshotPath)).href)}" target="_blank" style="color:#38bdf8;font-size:11px">📸 View Screenshot</a></div>` : '';
         return `<tr>
           <td style="padding:10px 14px;border-bottom:1px solid #1e293b;font-family:'JetBrains Mono',monospace;font-size:12px;color:#94a3b8">#${a.stepNumber}</td>
           <td style="padding:10px 14px;border-bottom:1px solid #1e293b;font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:600;color:#f59e0b">${this.esc(a.type.toUpperCase())}</td>

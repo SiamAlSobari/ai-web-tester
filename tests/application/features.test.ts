@@ -1,5 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { fileURLToPath } from 'node:url';
+import path from 'node:path';
+import fs from 'node:fs/promises';
 import { AssertionEngine } from '../../src/application/assertion-engine.js';
 import { VisualDiffEngine } from '../../src/adapters/outbound/visual-diff/visual-diff.js';
 import { assertUrlAllowed, isUrlAllowed } from '../../src/shared/config/security.js';
@@ -97,8 +99,13 @@ describe('Visual Diff Engine (#5)', () => {
   it('initializes baseline when missing', async () => {
     const engine = new VisualDiffEngine();
     const current = fileURLToPath(new URL('../../tsconfig.json', import.meta.url));
-    const res = await engine.compareScreenshots(current, `./__nonexistent_baseline_${Date.now()}.png`);
-    expect(res.hasDiff).toBe(false);
-    expect(res.message).toContain('Baseline');
+    const tempBaseline = path.resolve(process.cwd(), 'artifacts', 'temp', `test_baseline_${Date.now()}.png`);
+    try {
+      const res = await engine.compareScreenshots(current, tempBaseline);
+      expect(res.hasDiff).toBe(false);
+      expect(res.message).toContain('Baseline');
+    } finally {
+      await fs.unlink(tempBaseline).catch(() => {});
+    }
   });
 });

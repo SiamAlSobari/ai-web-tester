@@ -17,7 +17,7 @@ const program = new Command();
 program
   .name('ai-test')
   .description('Autonomous AI Web Testing Engine & Multi-Agent Integration CLI')
-  .version('0.3.2')
+  .version('0.4.0')
   .option('-v, --verbose', 'Enable debug logging', false)
   .hook('preAction', (thisCommand) => {
     if (thisCommand.opts().verbose) setLogLevel('debug');
@@ -341,6 +341,40 @@ program
   .option('--allowed-hosts <hosts>', 'Comma-separated allowed hosts')
   .action(async (options: { allowedHosts?: string }) => {
     await runMcpServer(undefined, parseAllowedHosts(options.allowedHosts));
+  });
+
+program
+  .command('clean')
+  .description('Clean temporary artifacts, screenshots, videos, and test reports')
+  .option('--all', 'Delete all artifacts and reports without confirmation', false)
+  .action(async () => {
+    const fsMod = await import('node:fs/promises');
+    const pathMod = await import('node:path');
+
+    const dirsToClean = [
+      pathMod.resolve(process.cwd(), 'artifacts'),
+      pathMod.resolve(process.cwd(), 'test-reports'),
+    ];
+
+    let totalDeleted = 0;
+    for (const dir of dirsToClean) {
+      try {
+        const exists = await fsMod.access(dir).then(() => true).catch(() => false);
+        if (!exists) continue;
+        const entries = await fsMod.readdir(dir, { withFileTypes: true });
+        for (const entry of entries) {
+          const fullPath = pathMod.join(dir, entry.name);
+          if (entry.isDirectory()) {
+            await fsMod.rm(fullPath, { recursive: true, force: true }).catch(() => {});
+          } else {
+            await fsMod.unlink(fullPath).catch(() => {});
+          }
+          totalDeleted++;
+        }
+      } catch {}
+    }
+
+    console.log(`\n🧹 Cleanup complete! Removed ${totalDeleted} item(s) from artifacts and test-reports.\n`);
   });
 
 program.parse(process.argv);

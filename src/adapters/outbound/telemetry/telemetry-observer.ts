@@ -1,20 +1,36 @@
 import type { Page, ConsoleMessage, Response, Request } from 'playwright';
-import { ITelemetryObserver } from '../../../domain/interfaces/telemetry-observer.interface.js';
+import { ITelemetryObserver, ConsoleLogEntry, NetworkLogEntry } from '../../../domain/interfaces/telemetry-observer.interface.js';
 import { Issue, IssueType } from '../../../domain/entities/issue.entity.js';
 
 export class PlaywrightTelemetryObserver implements ITelemetryObserver {
   private readonly issues: Issue[] = [];
+  private readonly consoleLogs: ConsoleLogEntry[] = [];
+  private readonly networkLogs: NetworkLogEntry[] = [];
+  private static readonly MAX_LOGS = 200;
   private attachedPage: Page | null = null;
 
   private readonly onConsole = (msg: ConsoleMessage) => {
     const type = msg.type();
     const text = msg.text();
+    const loc = msg.location();
+    const locStr = loc ? `${loc.url}:${loc.lineNumber}:${loc.columnNumber}` : undefined;
+
+    this.consoleLogs.push({
+      type,
+      text,
+      timestamp: new Date().toISOString(),
+      location: locStr,
+    });
+    if (this.consoleLogs.length > PlaywrightTelemetryObserver.MAX_LOGS) {
+      this.consoleLogs.shift();
+    }
+
     if (type === 'error' || type === 'warning') {
       const isSecurity = text.includes('Content Security Policy') || text.includes('CORS') || text.includes('blocked by CORS') || text.includes('Refused to connect');
       const issueType: IssueType = isSecurity ? 'SECURITY_WARNING' : type === 'error' ? 'CONSOLE_ERROR' : 'WARNING';
       this.issues.push(
         Issue.create(issueType, `[Browser Console ${type.toUpperCase()}] ${text}`, this.attachedPage?.url() ?? '', {
-          stack: msg.location() ? `${msg.location().url}:${msg.location().lineNumber}:${msg.location().columnNumber}` : undefined,
+          stack: locStr,
         })
       );
     }
@@ -33,6 +49,23 @@ export class PlaywrightTelemetryObserver implements ITelemetryObserver {
     const resourceType = res.request().resourceType();
     const url = res.url();
     const lowerUrl = url.toLowerCase();
+
+    // Record network history
+    try {
+      const timing = res.request().timing();
+      const duration = timing?.responseEnd && timing.responseEnd > 0 ? Math.round(timing.responseEnd) : undefined;
+      this.networkLogs.push({
+        method: res.request().method(),
+        url,
+        status,
+        resourceType,
+        timestamp: new Date().toISOString(),
+        durationMs: duration,
+      });
+      if (this.networkLogs.length > PlaywrightTelemetryObserver.MAX_LOGS) {
+        this.networkLogs.shift();
+      }
+    } catch {}
 
     // Check slow API performance (>2000ms)
     try {
@@ -106,6 +139,18 @@ export class PlaywrightTelemetryObserver implements ITelemetryObserver {
   private readonly onRequestFailed = (req: Request) => {
     const failure = req.failure();
     const errorText = failure?.errorText ?? 'Request failed';
+
+    this.networkLogs.push({
+      method: req.method(),
+      url: req.url(),
+      status: undefined,
+      resourceType: req.resourceType(),
+      timestamp: new Date().toISOString(),
+    });
+    if (this.networkLogs.length > PlaywrightTelemetryObserver.MAX_LOGS) {
+      this.networkLogs.shift();
+    }
+
     const isSecurity = errorText.includes('CORS') || errorText.includes('ERR_BLOCKED_BY_CSP') || errorText.includes('ERR_CERT');
     const issueType: IssueType = isSecurity ? 'SECURITY_WARNING' : 'NETWORK_FAILURE';
     this.issues.push(
@@ -153,8 +198,18 @@ export class PlaywrightTelemetryObserver implements ITelemetryObserver {
     return this.issues.filter((i) => new Date(i.timestamp).getTime() >= since);
   }
 
+  getConsoleLogs(limit = 50): ConsoleLogEntry[] {
+    return this.consoleLogs.slice(-limit);
+  }
+
+  getNetworkLogs(limit = 50): NetworkLogEntry[] {
+    return this.networkLogs.slice(-limit);
+  }
+
   clear(): void {
     this.issues.length = 0;
+    this.consoleLogs.length = 0;
+    this.networkLogs.length = 0;
   }
 
   detach(): void {

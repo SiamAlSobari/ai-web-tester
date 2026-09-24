@@ -13,3 +13,4 @@ artifacts/
 __nonexistent_baseline_*.png
 diff-*.png
 .astro/
+.codegraph/

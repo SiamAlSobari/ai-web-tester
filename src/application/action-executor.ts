@@ -117,7 +117,11 @@ export class ActionExecutor {
             return;
           case 'press':
             if (!params.value) throw new Error('Key name required for press action');
-            await this.driver.press(params.value);
+            if (params.ref !== undefined) {
+              await this.selfHealing(() => this.driver.press(params.value!), params.ref, 'press', params.value);
+            } else {
+              await this.driver.press(params.value);
+            }
             return;
           case 'select':
             if (params.ref === undefined) throw new Error('Ref ID required for select action');
@@ -213,6 +217,15 @@ export class ActionExecutor {
                 return;
               } else if (primaryType === 'upload' && filePathsParam) {
                 await loc.setInputFiles(filePathsParam, { timeout: 5000 });
+                return;
+              } else if (primaryType === 'press' && valParam) {
+                await loc.press(valParam, { timeout: 5000 });
+                return;
+              } else if (primaryType === 'check') {
+                await loc.check({ timeout: 5000 });
+                return;
+              } else if (primaryType === 'uncheck') {
+                await loc.uncheck({ timeout: 5000 });
                 return;
               }
               await primary();

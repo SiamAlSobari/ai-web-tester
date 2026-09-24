@@ -12,17 +12,14 @@ import { publishLiveEvent } from '../../../shared/events/live-bus.js';
 import { assertUrlAllowed, type SecurityConfig } from '../../../shared/config/security.js';
 
 export function createMcpServer(sessionManager?: SessionManager, securityConfig?: SecurityConfig): McpServer {
-  const driver = new PlaywrightDriver();
-  const telemetry = new PlaywrightTelemetryObserver();
-  const reporter = new MarkdownReporter();
-  const manager = sessionManager ?? new SessionManager(driver, telemetry, reporter);
+  const manager = sessionManager ?? new SessionManager(new PlaywrightDriver(), new PlaywrightTelemetryObserver(), new MarkdownReporter());
   if (securityConfig) manager.setSecurityConfig(securityConfig);
   const a11yAuditor = new A11yAuditor();
   const scenarioRunner = new ScenarioRunner(manager);
 
   const server = new McpServer({
     name: 'ai-browser-testing',
-    version: '0.3.2',
+    version: '0.4.0',
   });
 
   server.tool(
@@ -156,7 +153,7 @@ export function createMcpServer(sessionManager?: SessionManager, securityConfig?
         const { filepath } = await manager.takeScreenshot(name, fullPage, sessionId);
         let diffMsg = '';
         if (compareBaseline) {
-          const diff = await driver.compareScreenshot(filepath, compareBaseline, threshold);
+          const diff = await manager.compareScreenshot(filepath, compareBaseline, threshold);
           diffMsg = `\n\n🔍 Visual Regression: ${diff.message} (diff ${diff.diffPercentage}%)`;
         }
         return { content: [{ type: 'text', text: `📸 Screenshot saved: ${filepath}${diffMsg}` }] };
@@ -211,7 +208,7 @@ export function createMcpServer(sessionManager?: SessionManager, securityConfig?
     },
     async ({ urlPattern, status, body, contentType, sessionId }) => {
       try {
-        await driver.routeMock({ urlPattern, status, body, contentType });
+        await manager.routeMock({ urlPattern, status, body, contentType }, sessionId);
         return { content: [{ type: 'text', text: `🎭 Mocked ${urlPattern} -> ${status}` }] };
       } catch (err: unknown) {
         return { isError: true, content: [{ type: 'text', text: `❌ ${err instanceof Error ? err.message : String(err)}` }] };
@@ -223,9 +220,9 @@ export function createMcpServer(sessionManager?: SessionManager, securityConfig?
     'browser_mock_reset',
     'Removes network mocks (all or a specific pattern).',
     { urlPattern: z.string().optional(), sessionId: z.string().optional() },
-    async ({ urlPattern }) => {
+    async ({ urlPattern, sessionId }) => {
       try {
-        await driver.routeUnmock(urlPattern);
+        await manager.routeUnmock(urlPattern, sessionId);
         return { content: [{ type: 'text', text: `🧹 Mocks cleared${urlPattern ? ` for ${urlPattern}` : ''}` }] };
       } catch (err: unknown) {
         return { isError: true, content: [{ type: 'text', text: `❌ ${err instanceof Error ? err.message : String(err)}` }] };
@@ -237,11 +234,9 @@ export function createMcpServer(sessionManager?: SessionManager, securityConfig?
     'browser_audit_a11y',
     'Runs automated WCAG 2.1 AA accessibility audit on the active page.',
     { sessionId: z.string().optional() },
-    async () => {
+    async ({ sessionId }) => {
       try {
-        const page = driver.getRawPage() as unknown;
-        if (!page) throw new Error('No active page.');
-        const result = await driver.auditA11y();
+        const result = await manager.auditA11y(sessionId);
         const markdown = a11yAuditor.toMarkdownSummary(result);
         return { content: [{ type: 'text', text: markdown }] };
       } catch (err: unknown) {
@@ -261,7 +256,7 @@ export function createMcpServer(sessionManager?: SessionManager, securityConfig?
     async ({ url, maxDepth, maxPages }) => {
       try {
         const crawlDriver = new PlaywrightDriver();
-        const crawler = new SitemapCrawler(crawlDriver, telemetry);
+        const crawler = new SitemapCrawler(crawlDriver, manager.getTelemetry());
         const result = await crawler.crawl(url, { maxDepth, maxPages });
         const markdown = crawler.toMarkdownReport(result);
         await crawlDriver.close();
@@ -378,7 +373,7 @@ export function createMcpServer(sessionManager?: SessionManager, securityConfig?
     {},
     async () => {
       try {
-        const health = await (driver as unknown as { healthCheck?: () => Promise<unknown> }).healthCheck?.() ?? { alive: driver.isAlive() };
+        const health = await manager.healthCheck();
         const sessions = manager.listSessions();
         return { content: [{ type: 'text', text: `🏥 Health: ${JSON.stringify({ health, sessions: sessions.length }, null, 2)}` }] };
       } catch (err: unknown) {
@@ -391,9 +386,9 @@ export function createMcpServer(sessionManager?: SessionManager, securityConfig?
     'browser_wait_for',
     'Waits for element [ref] to reach visible/hidden/attached/detached state.',
     { ref: z.number(), state: z.enum(['visible', 'hidden', 'attached', 'detached']).optional().default('visible'), timeoutMs: z.number().optional().default(10000), sessionId: z.string().optional() },
-    async ({ ref, state, timeoutMs }) => {
+    async ({ ref, state, timeoutMs, sessionId }) => {
       try {
-        await (driver as unknown as { waitForSelector?: (r: number, s: string, t: number) => Promise<void> }).waitForSelector?.(ref, state, timeoutMs);
+        await manager.waitForSelector(ref, state, timeoutMs, sessionId);
         return { content: [{ type: 'text', text: `✅ [ref=${ref}] reached ${state}` }] };
       } catch (err: unknown) {
         return { isError: true, content: [{ type: 'text', text: `❌ waitFor failed: ${err instanceof Error ? err.message : String(err)}` }] };
@@ -405,9 +400,9 @@ export function createMcpServer(sessionManager?: SessionManager, securityConfig?
     'browser_extract',
     'Extracts text/value/html/href from element [ref] for variable chaining.',
     { ref: z.number(), attribute: z.enum(['text', 'value', 'html', 'href']).optional().default('text'), sessionId: z.string().optional() },
-    async ({ ref, attribute }) => {
+    async ({ ref, attribute, sessionId }) => {
       try {
-        const val = await (driver as unknown as { extractValue?: (r: number, a: string) => Promise<string> }).extractValue?.(ref, attribute) ?? '';
+        const val = await manager.extractValue(ref, attribute, sessionId);
         return { content: [{ type: 'text', text: `📋 [ref=${ref}] ${attribute}="${val}"` }] };
       } catch (err: unknown) {
         return { isError: true, content: [{ type: 'text', text: `❌ extract failed: ${err instanceof Error ? err.message : String(err)}` }] };
@@ -418,10 +413,10 @@ export function createMcpServer(sessionManager?: SessionManager, securityConfig?
   server.tool(
     'browser_live_screenshot',
     'Returns live base64 screenshot for dashboards (no file write).',
-    { fullPage: z.boolean().optional().default(false) },
-    async ({ fullPage }) => {
+    { fullPage: z.boolean().optional().default(false), sessionId: z.string().optional() },
+    async ({ fullPage, sessionId }) => {
       try {
-        const b64 = await (driver as unknown as { captureScreenshotBase64?: (fp: boolean) => Promise<string> }).captureScreenshotBase64?.(fullPage) ?? '';
+        const b64 = await manager.captureScreenshotBase64(fullPage, sessionId);
         return { content: [{ type: 'text', text: `📸 LIVE_SCREENSHOT_BASE64:${b64.slice(0, 80)}... (${b64.length} chars)` }, { type: 'image', data: b64, mimeType: 'image/png' } as unknown as { type: 'text'; text: string }] };
       } catch (err: unknown) {
         return { isError: true, content: [{ type: 'text', text: `❌ ${err instanceof Error ? err.message : String(err)}` }] };
@@ -461,6 +456,64 @@ export function createMcpServer(sessionManager?: SessionManager, securityConfig?
         return { content: [{ type: 'text', text: `📄 Scenario generated:\nFile: ${res.filepath}\n\n\`\`\`yaml\n${res.yaml}\n\`\`\`` }] };
       } catch (err: unknown) {
         return { isError: true, content: [{ type: 'text', text: `❌ generate_scenario failed: ${err instanceof Error ? err.message : String(err)}` }] };
+      }
+    }
+  );
+
+  server.tool(
+    'browser_console_logs',
+    'Retrieves recent browser console logs (info, warn, error, log) with optional level filter.',
+    {
+      limit: z.number().optional().default(50).describe('Max number of recent logs to return'),
+      type: z.enum(['all', 'error', 'warning', 'info', 'log']).optional().default('all').describe('Filter logs by type'),
+      sessionId: z.string().optional(),
+    },
+    async ({ limit, type, sessionId }) => {
+      try {
+        let logs = manager.getConsoleLogs(limit, sessionId);
+        if (type !== 'all') {
+          logs = logs.filter((l) => l.type === type);
+        }
+        if (logs.length === 0) {
+          return { content: [{ type: 'text', text: `📝 No console logs captured${type !== 'all' ? ` for type "${type}"` : ''}.` }] };
+        }
+        const formatted = logs
+          .map((l) => `[${l.timestamp.slice(11, 19)}] [${l.type.toUpperCase()}] ${l.text}${l.location ? ` (${l.location})` : ''}`)
+          .join('\n');
+        return { content: [{ type: 'text', text: `📝 Console Logs (${logs.length} entries):\n\n${formatted}` }] };
+      } catch (err: unknown) {
+        return { isError: true, content: [{ type: 'text', text: `❌ Failed to get console logs: ${err instanceof Error ? err.message : String(err)}` }] };
+      }
+    }
+  );
+
+  server.tool(
+    'browser_network_logs',
+    'Retrieves recent network requests and API responses with status codes and latencies.',
+    {
+      limit: z.number().optional().default(50).describe('Max number of recent network entries to return'),
+      failedOnly: z.boolean().optional().default(false).describe('Only return failed network requests (status >= 400 or network errors)'),
+      sessionId: z.string().optional(),
+    },
+    async ({ limit, failedOnly, sessionId }) => {
+      try {
+        let logs = manager.getNetworkLogs(limit, sessionId);
+        if (failedOnly) {
+          logs = logs.filter((l) => !l.status || l.status >= 400);
+        }
+        if (logs.length === 0) {
+          return { content: [{ type: 'text', text: `🌐 No network requests captured${failedOnly ? ' with errors' : ''}.` }] };
+        }
+        const formatted = logs
+          .map((l) => {
+            const statusStr = l.status !== undefined ? `HTTP ${l.status}` : 'FAILED';
+            const durationStr = l.durationMs !== undefined ? ` (${l.durationMs}ms)` : '';
+            return `[${l.timestamp.slice(11, 19)}] [${l.method}] ${statusStr}${durationStr} - ${l.url} [${l.resourceType}]`;
+          })
+          .join('\n');
+        return { content: [{ type: 'text', text: `🌐 Network Logs (${logs.length} entries):\n\n${formatted}` }] };
+      } catch (err: unknown) {
+        return { isError: true, content: [{ type: 'text', text: `❌ Failed to get network logs: ${err instanceof Error ? err.message : String(err)}` }] };
       }
     }
   );

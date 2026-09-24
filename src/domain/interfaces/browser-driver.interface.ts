@@ -98,6 +98,7 @@ export interface IBrowserDriver {
   apiRequest?(options: { method: string; url: string; body?: string | Record<string, unknown>; headers?: Record<string, string> }): Promise<{ status: number; body: string }>;
   getElementRef?(ref: number): import('../value-objects/element-ref.vo.js').ElementRef | undefined;
   fillForm?(options?: { formRef?: number; mode?: 'valid' | 'fuzz'; overrides?: Record<string, string> }): Promise<{ filledFields: Record<string, string>; message: string }>;
+  captureScreenshotBase64?(fullPage?: boolean): Promise<string>;
 }
 
 

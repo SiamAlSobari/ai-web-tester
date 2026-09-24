@@ -1,6 +1,6 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import YAML from 'js-yaml';
+import { load as yamlLoad } from 'js-yaml';
 import { SessionManager } from '../session-manager.js';
 import { ActionType } from '../../domain/entities/action.entity.js';
 import { AssertionEngine, type AssertionKind, type ComparisonOperator } from '../assertion-engine.js';
@@ -61,7 +61,7 @@ export class ScenarioRunner {
 
   async runFromYaml(filePath: string): Promise<ScenarioRunResult> {
     const raw = await fs.readFile(filePath, 'utf-8');
-    const config = YAML.load(raw) as ScenarioConfig;
+    const config = yamlLoad(raw) as ScenarioConfig;
     return this.run(config);
   }
 
