@@ -1,8 +1,8 @@
 ---
 import '../styles/global.css';
 
-const title = "AI Web Tester | Autonomous Browser Testing Engine for AI Coding Agents";
-const desc = "Equip AI assistants with automated browser execution, ARIA DOM token pruning, and comprehensive telemetry. Headless Chromium, 17 MCP tools, zero hallucinations.";
+const title = "AI Web Tester | Autonomous Browser Testing Engine & MCP Suite for AI Agents";
+const desc = "Autonomous browser execution, semantic ARIA compression, and 360-degree runtime telemetry for AI coding agents. Compatible with Antigravity, OpenCode, Claude Code, Cursor, and Windsurf.";
 ---
 <!doctype html>
 <html lang="en" class="dark">
@@ -11,300 +11,552 @@ const desc = "Equip AI assistants with automated browser execution, ARIA DOM tok
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>{title}</title>
   <meta name="description" content={desc} />
-  <meta name="theme-color" content="#0a0f1c" />
+  <meta name="theme-color" content="#09090b" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Fragment+Mono&family=IBM+Plex+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
   <style>
-    ::selection { background: #f59e0b; color: #0a0f1c; }
-    * { scrollbar-width: thin; scrollbar-color: #334155 #0a0f1c; }
-    *::-webkit-scrollbar { width: 8px; height: 8px; }
-    *::-webkit-scrollbar-thumb { background: #334155; border-radius: 999px; }
-    :focus-visible { outline: 2px solid #06b6d4; outline-offset: 2px; }
+    ::selection { background: #f59e0b; color: #09090b; }
+    * { scrollbar-width: thin; scrollbar-color: #3f3f46 #09090b; }
+    *::-webkit-scrollbar { width: 6px; height: 6px; }
+    *::-webkit-scrollbar-thumb { background: #3f3f46; border-radius: 4px; }
+    *::-webkit-scrollbar-track { background: #09090b; }
+    :focus-visible { outline: 2px solid #f59e0b; outline-offset: 2px; }
   </style>
 </head>
-<body class="bg-[#0a0f1c] text-[#f8fafc] font-sans antialiased">
-  <!-- Nav -->
-  <header class="sticky top-0 z-40 backdrop-blur bg-[#0a0f1c]/90 border-b border-[#1e293b]">
-    <div class="mx-auto max-w-[1160px] px-6 h-[64px] flex items-center justify-between">
-      <a href="/" class="flex items-center gap-3">
-        <span class="w-8 h-8 rounded-lg bg-[#0f172a] border border-[#1e293b] grid place-items-center">
-          <span class="w-2.5 h-2.5 rounded-full bg-amber-400"></span>
+<body class="bg-[#09090b] text-[#fafafa] font-sans antialiased selection:bg-amber-500 selection:text-black min-h-screen flex flex-col">
+
+  <!-- Navigation Bar -->
+  <header class="sticky top-0 z-50 backdrop-blur-md bg-[#09090b]/90 border-b border-[#27272a]">
+    <div class="mx-auto max-w-7xl px-4 sm:px-6 h-16 flex items-center justify-between gap-4">
+      <a href="/" class="flex items-center gap-3 group focus:outline-none">
+        <span class="w-8 h-8 rounded-md bg-[#18181b] border border-[#27272a] group-hover:border-amber-500/50 flex items-center justify-center transition-colors">
+          <span class="w-2.5 h-2.5 rounded-sm bg-amber-500"></span>
         </span>
-        <span class="font-mono text-[13px] tracking-[0.14em] font-semibold text-slate-100">AI WEB TESTER</span>
-        <span class="hidden sm:inline text-[11px] px-2 py-0.5 rounded-full border border-[#1e293b] text-slate-400 font-mono">v0.4.0 · MCP</span>
+        <div class="flex items-center gap-2">
+          <span class="font-mono text-sm tracking-wider font-semibold text-zinc-100">AI WEB TESTER</span>
+          <span class="text-xs px-2 py-0.5 rounded border border-[#27272a] text-zinc-400 font-mono bg-[#121215]">v0.4.0</span>
+        </div>
       </a>
-      <nav class="hidden md:flex items-center gap-6 text-[13px] text-slate-300">
-        <a href="/intro" class="hover:text-white transition-colors">Docs</a>
-        <a href="/cli/overview" class="hover:text-white transition-colors">CLI</a>
-        <a href="/mcp/overview" class="hover:text-white transition-colors">MCP Tools</a>
-        <a href="https://github.com/SiamAlSobari/ai-web-tester" class="hover:text-white transition-colors">GitHub</a>
+
+      <nav class="hidden md:flex items-center gap-6 text-sm text-zinc-300">
+        <a href="/intro" class="hover:text-amber-400 transition-colors">Documentation</a>
+        <a href="/cli/overview" class="hover:text-amber-400 transition-colors">CLI Reference</a>
+        <a href="/mcp/overview" class="hover:text-amber-400 transition-colors">MCP Tools (24)</a>
+        <a href="https://github.com/SiamAlSobari/ai-web-tester" target="_blank" rel="noopener noreferrer" class="hover:text-amber-400 transition-colors flex items-center gap-1.5">
+          <span>GitHub</span>
+          <svg class="w-3.5 h-3.5 text-zinc-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg>
+        </a>
       </nav>
-      <div class="flex items-center gap-3">
-        <a href="/intro" class="hidden sm:inline text-[13px] px-4 py-2 rounded-full border border-[#334155] text-slate-200 hover:border-slate-400 transition-colors">Documentation</a>
-        <a href="#install" class="text-[13px] px-4 py-2 rounded-full bg-amber-400 text-black font-semibold hover:bg-amber-300 transition-colors">Install Setup</a>
+
+      <div class="flex items-center gap-2.5">
+        <a href="#quickstart" class="hidden sm:inline-flex items-center gap-2 px-3.5 py-1.5 rounded-md bg-[#18181b] border border-[#27272a] text-xs font-mono text-zinc-300 hover:border-zinc-500 transition-colors">
+          <span class="text-amber-400">$</span> npx ai-test init
+        </a>
+        <a href="/intro" class="px-3.5 py-1.5 rounded-md bg-amber-500 text-black font-semibold text-xs hover:bg-amber-400 transition-colors">
+          Documentation Guide
+        </a>
       </div>
     </div>
   </header>
 
-  <!-- HERO -->
-  <section class="mx-auto max-w-[1160px] px-6 pt-10 pb-8 lg:pt-14">
-    <div class="grid lg:grid-cols-[1.05fr_0.95fr] gap-10 items-start">
-      <div>
-        <div class="inline-flex items-center gap-2 text-[11px] tracking-[0.14em] font-mono text-slate-400 border border-[#1e293b] rounded-full px-3 py-1.5">
-          <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
-          HEADLESS CHROMIUM · ARIA PRUNING · 360 TELEMETRY
-        </div>
-        <h1 class="mt-6 font-bold leading-[0.94] tracking-[-0.03em] text-[40px] sm:text-[52px] lg:text-[56px]">
-          Autonomous browser execution<br/>
-          <span class="text-amber-400">for AI coding agents</span>
-        </h1>
-        <p class="mt-5 text-[16px] leading-7 text-slate-300 max-w-[56ch]">
-          Code generation without visual verification creates blind spots. AI Web Tester drives real web sessions, validates DOM mutations, detects runtime exceptions, and produces structured markdown reports with deterministic element references.
-        </p>
-        <div class="mt-7 flex flex-wrap gap-3 items-center">
-          <a href="#install" class="px-5 py-3 rounded-full bg-amber-400 text-black font-semibold text-[14px] hover:bg-amber-300 transition-colors">
-            npx ai-test init &rarr;
-          </a>
-          <a href="/intro" class="px-5 py-3 rounded-full border border-[#334155] text-slate-200 text-[14px] hover:border-slate-400 transition-colors">
-            Explore Documentation
-          </a>
-          <span class="inline-flex items-center gap-2 text-[12px] text-slate-400 font-mono">
-            <span class="w-1.5 h-1.5 rounded-full bg-cyan-400"></span> Node &gt;= 20 · Playwright 1.49 · ESM
-          </span>
-        </div>
-        <div class="mt-8 grid grid-cols-3 divide-x divide-[#1e293b] border border-[#1e293b] rounded-2xl overflow-hidden max-w-[560px] bg-[#0f172a]">
-          <div class="px-5 py-4">
-            <div class="font-mono text-[22px] font-semibold text-slate-100">&gt;90%</div>
-            <div class="text-[11px] tracking-[0.1em] text-slate-400">TOKEN CUT</div>
-          </div>
-          <div class="px-5 py-4">
-            <div class="font-mono text-[22px] font-semibold text-slate-100">19</div>
-            <div class="text-[11px] tracking-[0.1em] text-slate-400">MCP TOOLS</div>
-          </div>
-          <div class="px-5 py-4">
-            <div class="font-mono text-[22px] font-semibold text-slate-100">5</div>
-            <div class="text-[11px] tracking-[0.1em] text-slate-400">SUPPORTED AGENTS</div>
-          </div>
-        </div>
-        <div class="mt-4 flex flex-wrap gap-2 text-[11px] font-mono text-slate-400">
-          <span class="px-2.5 py-1 rounded-full bg-[#111827] border border-[#1e293b]">OpenCode</span>
-          <span class="px-2.5 py-1 rounded-full bg-[#111827] border border-[#1e293b]">Antigravity</span>
-          <span class="px-2.5 py-1 rounded-full bg-[#111827] border border-[#1e293b]">Claude Code</span>
-          <span class="px-2.5 py-1 rounded-full bg-[#111827] border border-[#1e293b]">Cursor</span>
-          <span class="px-2.5 py-1 rounded-full bg-[#111827] border border-[#1e293b]">Windsurf</span>
-        </div>
-      </div>
+  <!-- Main Content -->
+  <main class="flex-1">
 
-      <!-- Right: Live bench -->
-      <div class="space-y-4">
-        <div class="rounded-[20px] border border-[#1e293b] bg-[#0f172a] overflow-hidden">
-          <div class="flex items-center justify-between px-4 h-11 border-b border-[#1e293b] bg-[#0a0f1c]">
-            <span class="font-mono text-[11px] tracking-[0.12em] text-slate-400">ARIA BENCH V2: LIVE SESSION</span>
-            <span class="text-[11px] px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-300 border border-emerald-500/20 font-mono">STATUS: PASSED (2480ms)</span>
-          </div>
-          <div class="p-4 font-mono text-[12.5px] leading-6">
-            <div class="text-slate-400">PAGE: "Customer Portal &amp; Checkout" (1280x720)</div>
-            <div class="mt-3 space-y-1">
-              <div><span class="text-amber-400">[1]</span> textbox "Email" <span class="text-emerald-400 font-mono">[in-viewport]</span> <span class="text-slate-400">(data-testid="user-email")</span></div>
-              <div><span class="text-amber-400">[2]</span> combobox "Country" <span class="text-emerald-400 font-mono">[in-viewport]</span> <span class="text-cyan-300">(options=["US", "ID", "SG", "JP"])</span></div>
-              <div><span class="text-amber-400">[3]</span> button "Pay Now (Credit Card)" <span class="text-emerald-400 font-mono">[in-viewport]</span></div>
-              <div><span class="text-amber-400">[4]</span> button "Help &amp; Documentation" <span class="text-slate-500 font-mono">[below-fold]</span> <span class="text-slate-400">(svg: "icon-help")</span></div>
-            </div>
-            <div class="mt-4 grid grid-cols-2 gap-2 text-[11px]">
-              <div class="rounded-lg bg-[#0a0f1c] border border-[#1e293b] p-2.5 font-mono">fill_form(<span class="text-amber-400">mode="valid"</span>) <span class="text-emerald-400">&rarr; 6 fields</span></div>
-              <div class="rounded-lg bg-[#0a0f1c] border border-[#1e293b] p-2.5 font-mono">self_heal(<span class="text-cyan-300">data-testid</span>) <span class="text-emerald-400">&rarr; recovered</span></div>
-            </div>
-          </div>
-          <div class="px-4 py-3 border-t border-[#1e293b] flex items-center justify-between text-[11px] font-mono">
-            <span class="text-slate-400">Telemetry: 0 CORS / CSP / Slow API warnings</span>
-            <span class="text-emerald-300">Self-Healing V2 Active</span>
-          </div>
-        </div>
-        <div class="rounded-2xl border border-amber-400/20 bg-amber-400/10 p-4 flex items-start gap-3">
-          <span class="w-6 h-6 rounded-md bg-amber-400 text-black grid place-items-center font-mono font-bold text-xs shrink-0">i</span>
-          <div class="text-[13px] leading-6 text-slate-200">
-            <strong class="text-white">Deterministic Execution &amp; Self-Healing:</strong> Dynamic DOM re-renders automatically heal via <code class="text-amber-300">data-testid</code>, <code class="text-amber-300">id</code>, and semantic role fallbacks with zero flaky failures.
-          </div>
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <!-- Highlights -->
-  <section class="mx-auto max-w-[1160px] px-6 py-8">
-    <div class="grid lg:grid-cols-3 gap-4">
-      <div class="rounded-[18px] border border-[#1e293b] bg-[#0f172a] p-6">
-        <div class="font-mono text-[11px] tracking-[0.14em] text-amber-400">01 / SELF-HEALING LOCATORS V2</div>
-        <h3 class="mt-2 text-[16px] font-semibold text-slate-100">Zero-Flakiness Resilient Execution</h3>
-        <p class="mt-2 text-[13px] leading-6 text-slate-400">
-          Full-spectrum self-healing across click, fill, select, hover, and upload. Resilient against SPA re-renders and dynamic CSS shifts.
-        </p>
-        <div class="mt-4 font-mono text-[11px] text-slate-500">Fallback hierarchy: data-testid &gt; id &gt; name &gt; text</div>
-      </div>
-      <div class="rounded-[18px] border border-[#1e293b] bg-[#0f172a] p-6">
-        <div class="font-mono text-[11px] tracking-[0.14em] text-cyan-400">02 / SMART FORM AUTO-FILLER</div>
-        <h3 class="mt-2 text-[16px] font-semibold text-slate-100">Semantics &amp; Security Fuzzing</h3>
-        <p class="mt-2 text-[13px] leading-6 text-slate-400">
-          Automatically detects email, password, phone, name, and date fields. Fills realistic data or executes security boundary fuzzing in one action.
-        </p>
-        <code class="mt-4 block rounded-lg bg-[#020617] border border-[#1e293b] p-3 font-mono text-[11px] text-slate-300">browser_fill_form(mode="valid" | "fuzz")</code>
-      </div>
-      <div class="rounded-[18px] border border-[#1e293b] bg-[#0f172a] p-6">
-        <div class="font-mono text-[11px] tracking-[0.14em] text-emerald-400">03 / 360 TELEMETRY &amp; SECURITY</div>
-        <h3 class="mt-2 text-[16px] font-semibold text-slate-100">Security Violations &amp; Latency Watchdog</h3>
-        <p class="mt-2 text-[13px] leading-6 text-slate-400">
-          Captures CORS and CSP security violations, identifies slow API requests (>2000ms), and formats JSON responses for developer inspection.
-        </p>
-        <div class="mt-4 text-[11px] font-mono text-slate-500">SECURITY_WARNING &amp; SLOW_NETWORK_WARNING tagging</div>
-      </div>
-    </div>
-    <div class="mt-4 grid lg:grid-cols-3 gap-4">
-      <div class="rounded-[18px] border border-[#1e293b] bg-[#0a0f1c] p-6">
-        <div class="font-mono text-[11px] tracking-[0.12em] text-slate-400">DEVELOPER REPL &amp; DOCTOR</div>
-        <div class="mt-2 text-[14px] font-medium text-slate-200">Terminal Shell &amp; Health Probes</div>
-        <p class="mt-1 text-[13px] text-slate-400"><code class="text-amber-300 font-mono">ai-test doctor</code> diagnoses environment and agent configs; <code class="text-amber-300 font-mono">ai-test repl</code> provides live QA shell.</p>
-      </div>
-      <div class="rounded-[18px] border border-[#1e293b] bg-[#0a0f1c] p-6">
-        <div class="font-mono text-[11px] tracking-[0.12em] text-slate-400">OFFLINE HAR REPLAY &amp; CI</div>
-        <div class="mt-2 text-[14px] font-medium text-slate-200">Deterministic CI/CD Pipelines</div>
-        <p class="mt-1 text-[13px] text-slate-400">Replay network fixtures via <code class="text-amber-300 font-mono">--replay-har</code> and export reports directly to GitHub Actions PR summaries.</p>
-      </div>
-      <div class="rounded-[18px] border border-[#1e293b] bg-[#0a0f1c] p-6">
-        <div class="font-mono text-[11px] tracking-[0.12em] text-slate-400">SITEMAP &amp; DEEP FORMS</div>
-        <div class="mt-2 text-[14px] font-medium text-slate-200">Authenticated Crawling V2</div>
-        <p class="mt-1 text-[13px] text-slate-400">Crawl authenticated internal routes via <code class="text-amber-300 font-mono">storageState</code> and extract form methods and input trees.</p>
-      </div>
-    </div>
-  </section>
-
-  <!-- MCP grid -->
-  <section class="mx-auto max-w-[1160px] px-6 py-10">
-    <div class="flex items-end justify-between gap-4">
-      <div>
-        <div class="text-[11px] font-mono tracking-[0.14em] text-slate-400 uppercase">Tool Specifications</div>
-        <h2 class="mt-1 text-[22px] font-semibold tracking-[-0.02em] text-slate-100">19 MCP Tools in a Unified Suite</h2>
-      </div>
-      <a href="/mcp/overview" class="text-[13px] text-slate-400 hover:text-white transition-colors">View specifications &rarr;</a>
-    </div>
-    <div class="mt-5 grid sm:grid-cols-2 lg:grid-cols-4 gap-3 font-mono text-[12px]">
-      {[
-        ['browser_open','url · headless · device · storageState · replayHar · trace'],
-        ['browser_act','click / fill / hover / press / select / scroll / upload'],
-        ['browser_fill_form','smart form auto-fill & security fuzzing engine'],
-        ['browser_generate_scenario','auto-generate replayable YAML test scenario'],
-        ['browser_inspect','refresh refs & capture telemetry state + inViewport'],
-        ['browser_switch_tab','multi-tab navigation and OAuth popups'],
-        ['browser_save_auth','cookies and storageState persistence'],
-        ['browser_audit_a11y','axe-core automated WCAG 2.1 AA auditing'],
-        ['browser_crawl','depth-limited crawler, broken links & form discovery'],
-        ['browser_screenshot','fullPage capture and baseline pixel diffing'],
-        ['browser_report','markdown generation with YAML metadata'],
-        ['browser_assert','element visibility, text, and value checking'],
-        ['browser_assert_perf','FCP, DOM load, and TTFB budget validation'],
-        ['browser_mock','network route mocking for 4xx/5xx simulations'],
-        ['browser_sessions','enumeration of active browser contexts'],
-        ['browser_health','health probe, memory, and engine status'],
-        ['browser_wait_for','deterministic wait for state attachment'],
-        ['browser_extract','content extraction for text, values, and HTML'],
-        ['browser_close','session teardown and memory reclamation'],
-      ].map(([name, desc]) => (
-        <div class="rounded-xl border border-[#1e293b] bg-[#0f172a] p-4">
-          <div class="text-amber-300 font-semibold">{name}</div>
-          <div class="mt-1 text-slate-400 leading-5 text-[11.5px]">{desc}</div>
-        </div>
-      ))}
-    </div>
-  </section>
-
-  <!-- Install -->
-  <section id="install" class="mx-auto max-w-[1160px] px-6 py-8">
-    <div class="rounded-[20px] border border-[#1e293b] bg-[#0f172a] overflow-hidden">
-      <div class="px-6 py-5 border-b border-[#1e293b] flex flex-wrap items-center justify-between gap-3">
+    <!-- Hero Section -->
+    <section class="mx-auto max-w-7xl px-4 sm:px-6 pt-12 pb-16 lg:pt-16">
+      <div class="grid lg:grid-cols-[1.1fr_0.9fr] gap-12 items-start">
         <div>
-          <h2 class="text-[18px] font-semibold text-slate-100">Setup Across All Major Coding Agents</h2>
-          <p class="text-[12px] text-slate-400 mt-0.5">Automated configuration installer for your editor environment.</p>
+          <div class="inline-flex items-center gap-2 text-xs font-mono text-zinc-400 border border-[#27272a] rounded px-3 py-1 bg-[#121215]">
+            <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
+            <span>PLAYWRIGHT 1.49 · 24 MCP TOOLS · ZERO FLAKINESS</span>
+          </div>
+
+          <h1 class="mt-6 font-bold tracking-tight text-3xl sm:text-5xl lg:text-5xl text-zinc-50 leading-[1.1]">
+            Autonomous browser execution and testing for <span class="text-amber-400">AI coding agents</span>
+          </h1>
+
+          <p class="mt-5 text-base sm:text-lg text-zinc-300 leading-relaxed max-w-2xl">
+            AI agents can write code, but they cannot experience runtime behavior. AI Web Tester gives your coding agents real eyes and hands in headless Chromium: compressed ARIA accessibility snapshots, deterministic element references, and deep runtime crash telemetries.
+          </p>
+
+          <div class="mt-8 flex flex-wrap gap-3 items-center">
+            <a href="#quickstart" class="px-5 py-2.5 rounded-md bg-amber-500 text-black font-semibold text-sm hover:bg-amber-400 transition-colors flex items-center gap-2">
+              <span>Quick Install Guide</span>
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+            </a>
+            <a href="/mcp/overview" class="px-5 py-2.5 rounded-md bg-[#18181b] border border-[#27272a] text-zinc-200 text-sm hover:border-zinc-500 transition-colors">
+              Explore 24 MCP Tools
+            </a>
+          </div>
+
+          <!-- Verified Specs Bar -->
+          <div class="mt-10 grid grid-cols-2 sm:grid-cols-4 gap-px bg-[#27272a] border border-[#27272a] rounded-lg overflow-hidden text-center">
+            <div class="bg-[#121215] p-4">
+              <div class="font-mono text-2xl font-bold text-zinc-100">24</div>
+              <div class="text-[11px] font-mono tracking-wider text-zinc-400 uppercase mt-0.5">MCP Tools</div>
+            </div>
+            <div class="bg-[#121215] p-4">
+              <div class="font-mono text-2xl font-bold text-zinc-100">&gt;90%</div>
+              <div class="text-[11px] font-mono tracking-wider text-zinc-400 uppercase mt-0.5">Token Reduction</div>
+            </div>
+            <div class="bg-[#121215] p-4">
+              <div class="font-mono text-2xl font-bold text-zinc-100">5</div>
+              <div class="text-[11px] font-mono tracking-wider text-zinc-400 uppercase mt-0.5">AI Ecosystems</div>
+            </div>
+            <div class="bg-[#121215] p-4">
+              <div class="font-mono text-2xl font-bold text-emerald-400">40 / 40</div>
+              <div class="text-[11px] font-mono tracking-wider text-zinc-400 uppercase mt-0.5">Passed Tests</div>
+            </div>
+          </div>
+
+          <!-- Ecosystem list -->
+          <div class="mt-4 flex flex-wrap items-center gap-2 text-xs font-mono text-zinc-400">
+            <span class="text-zinc-500">Native integration with:</span>
+            <span class="px-2 py-0.5 rounded bg-[#18181b] border border-[#27272a] text-zinc-300">Antigravity</span>
+            <span class="px-2 py-0.5 rounded bg-[#18181b] border border-[#27272a] text-zinc-300">OpenCode</span>
+            <span class="px-2 py-0.5 rounded bg-[#18181b] border border-[#27272a] text-zinc-300">Claude Code</span>
+            <span class="px-2 py-0.5 rounded bg-[#18181b] border border-[#27272a] text-zinc-300">Cursor</span>
+            <span class="px-2 py-0.5 rounded bg-[#18181b] border border-[#27272a] text-zinc-300">Windsurf</span>
+          </div>
         </div>
-        <span class="font-mono text-[11px] tracking-[0.12em] text-slate-400">npx ai-test init</span>
-      </div>
-      <div class="grid lg:grid-cols-[1.1fr_0.9fr] gap-0">
-        <div class="p-6">
-          <div class="flex flex-wrap gap-2 text-[11px] font-mono">
-            <span class="px-3 py-1.5 rounded-full bg-amber-400 text-black font-semibold">all agents</span>
-            <span class="px-3 py-1.5 rounded-full border border-[#1e293b] text-slate-400">opencode</span>
-            <span class="px-3 py-1.5 rounded-full border border-[#1e293b] text-slate-400">antigravity</span>
-            <span class="px-3 py-1.5 rounded-full border border-[#1e293b] text-slate-400">claude</span>
-            <span class="px-3 py-1.5 rounded-full border border-[#1e293b] text-slate-400">cursor</span>
-            <span class="px-3 py-1.5 rounded-full border border-[#1e293b] text-slate-400">windsurf</span>
-          </div>
-          <pre class="mt-4 rounded-xl bg-[#020617] border border-[#1e293b] p-4 font-mono text-[13px] leading-6 overflow-auto text-slate-200"><code><span class="text-slate-500"># Interactive configuration wizard</span>
-npx ai-test init
 
-<span class="text-slate-500"># Diagnostics & Agent Check</span>
-npx ai-test doctor
+        <!-- Right Column: Interactive Session Terminal Simulation -->
+        <div class="space-y-4">
+          <div class="rounded-lg border border-[#27272a] bg-[#121215] overflow-hidden shadow-2xl">
+            <div class="flex items-center justify-between px-4 py-3 border-b border-[#27272a] bg-[#18181b]">
+              <div class="flex items-center gap-2">
+                <span class="w-3 h-3 rounded-full bg-[#ef4444]/80"></span>
+                <span class="w-3 h-3 rounded-full bg-[#f59e0b]/80"></span>
+                <span class="w-3 h-3 rounded-full bg-[#10b981]/80"></span>
+                <span class="ml-2 font-mono text-xs text-zinc-400">MCP Session: Chrome 1280x720</span>
+              </div>
+              <span class="text-[11px] font-mono px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                ACTIVE
+              </span>
+            </div>
 
-<span class="text-slate-500"># Target specific agent configurations</span>
-npx ai-test init -a opencode antigravity claude cursor windsurf
+            <div class="p-4 font-mono text-xs leading-relaxed space-y-3 bg-[#09090b]">
+              <div class="text-zinc-400">
+                <span class="text-emerald-400">&gt;</span> browser_open({`{"url": "http://localhost:3000/login", "headless": true}`})
+              </div>
 
-<span class="text-slate-500"># Interactive REPL</span>
-npx ai-test repl</code></pre>
-          <div class="mt-4 flex gap-2">
-            <a href="/installation" class="px-4 py-2 rounded-full bg-white text-black text-[13px] font-semibold hover:bg-slate-200 transition-colors">Installation Guide &rarr;</a>
-            <a href="https://github.com/SiamAlSobari/ai-web-tester" class="px-4 py-2 rounded-full border border-[#334155] text-slate-200 text-[13px] hover:border-slate-400 transition-colors">GitHub Repository</a>
+              <div class="p-3 rounded bg-[#121215] border border-[#27272a] text-zinc-300 space-y-1">
+                <div class="text-zinc-400 font-semibold">PAGE: "Customer Portal" · 1280x720</div>
+                <div class="text-zinc-500 text-[11px]">Render: Load: 120ms | DCL: 45ms | FCP: 70ms</div>
+                <div class="pt-2 border-t border-[#27272a] text-zinc-300 space-y-1">
+                  <div><span class="text-amber-400 font-bold">[1]</span> textbox "Email" <span class="text-zinc-500">(type="email", required)</span></div>
+                  <div><span class="text-amber-400 font-bold">[2]</span> textbox "Password" <span class="text-zinc-500">(type="password")</span></div>
+                  <div><span class="text-amber-400 font-bold">[3]</span> button "Sign In" <span class="text-emerald-400">[in-viewport]</span></div>
+                  <div><span class="text-amber-400 font-bold">[4]</span> link "Forgot Password?" <span class="text-zinc-500">[href="/forgot"]</span></div>
+                </div>
+              </div>
+
+              <div class="text-zinc-400">
+                <span class="text-emerald-400">&gt;</span> browser_act({`{"action": "fill", "ref": 1, "value": "qa@test.com"}`})
+                <div class="text-zinc-400 pl-3">OK: Filled [ref=1] with "qa@test.com"</div>
+              </div>
+
+              <div class="text-zinc-400">
+                <span class="text-emerald-400">&gt;</span> browser_act({`{"action": "click", "ref": 3}`})
+                <div class="text-emerald-400 pl-3">OK: Clicked [ref=3] (Self-Healing Active)</div>
+              </div>
+
+              <div class="p-2.5 rounded bg-amber-500/10 border border-amber-500/20 text-zinc-300 flex items-start gap-2.5 text-[11px]">
+                <span class="text-amber-400 font-bold">i</span>
+                <span>Deterministic ref numbers replace CSS selectors. If DOM tree mutates, self-healing resolves with data-testid and semantic roles automatically.</span>
+              </div>
+            </div>
           </div>
         </div>
-        <div class="border-t lg:border-t-0 lg:border-l border-[#1e293b] p-6 bg-[#0a0f1c]">
-          <div class="font-mono text-[11px] tracking-[0.12em] text-slate-400">CLI COMMAND REFERENCE</div>
-          <pre class="mt-3 rounded-xl bg-[#020617] border border-[#1e293b] p-4 font-mono text-[12px] leading-6 overflow-auto text-slate-200"><code>ai-test doctor
-ai-test repl
-ai-test generate http://localhost:3000
-ai-test test http://localhost:3000 --replay-har ./fixtures.har --html
-ai-test crawl http://localhost:3000 --depth 3 --pages 20
-ai-test run ./scenario.yaml
-ai-test ui --port 3100</code></pre>
-          <div class="mt-4 text-[12px] leading-6 text-slate-400">
-            Requires Node &gt;= 20. Chromium is installed with <code class="px-1.5 py-0.5 rounded bg-[#1e293b] text-slate-200">npx playwright install chromium</code>
-          </div>
       </div>
-    </div>
-  </section>
+    </section>
 
-  <!-- Report preview -->
-  <section class="mx-auto max-w-[1160px] px-6 py-8">
-    <div class="grid lg:grid-cols-[0.95fr_1.05fr] gap-6 items-start">
-      <div>
-        <h2 class="text-[18px] font-semibold text-slate-100">Machine-Readable &amp; Human-Auditable Reports</h2>
-        <p class="mt-2 text-[13px] leading-6 text-slate-400">
-          Markdown with structured frontmatter, step execution tables, error stack traces, and direct links to screenshot artifacts. HTML and JUnit export formats available for CI/CD pipelines.
+    <!-- Interactive Comparison: Raw DOM Dump vs ARIA Snapshot -->
+    <section class="border-y border-[#27272a] bg-[#121215] py-14">
+      <div class="mx-auto max-w-7xl px-4 sm:px-6">
+        <div class="max-w-2xl">
+          <div class="text-xs font-mono text-amber-400 uppercase tracking-wider font-semibold">Semantic Pruning Benchmark</div>
+          <h2 class="mt-2 text-2xl sm:text-3xl font-bold text-zinc-100">Why raw DOM dumps cause agent hallucinations</h2>
+          <p class="mt-2 text-sm text-zinc-400 leading-relaxed">
+            Standard scraping dumps 30,000+ tokens of nested `div` wrappers, Tailwind utility strings, and SVG paths into the LLM context. AI Web Tester strips the noise and gives the agent only what is interactive and accessible.
+          </p>
+        </div>
+
+        <div class="mt-8 grid lg:grid-cols-2 gap-6 items-stretch">
+          <!-- Unpruned HTML -->
+          <div class="rounded-lg border border-[#27272a] bg-[#09090b] p-5 flex flex-col justify-between">
+            <div>
+              <div class="flex items-center justify-between pb-3 border-b border-[#27272a]">
+                <div class="flex items-center gap-2">
+                  <span class="w-2 h-2 rounded-full bg-red-400"></span>
+                  <span class="font-mono text-xs text-zinc-300 font-semibold">Raw Unpruned DOM Dump (Default)</span>
+                </div>
+                <span class="font-mono text-[11px] px-2 py-0.5 rounded bg-red-500/10 text-red-400 border border-red-500/20">
+                  ~28,400 TOKENS
+                </span>
+              </div>
+              <pre class="mt-4 font-mono text-xs text-zinc-500 overflow-x-auto leading-relaxed"><code>&lt;div class="min-h-screen bg-slate-900 flex flex-col..."&gt;
+  &lt;div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8"&gt;
+    &lt;div class="py-12 flex justify-between items-center"&gt;
+      &lt;div class="relative flex items-center gap-3"&gt;
+        &lt;svg class="w-6 h-6 text-amber-500" viewBox="0 0 24 24"&gt;
+          &lt;path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2..."/&gt;
+        &lt;/svg&gt;
+        &lt;span class="font-bold text-white tracking-wide"&gt;App&lt;/span&gt;
+      &lt;/div&gt;
+      &lt;form class="space-y-6 bg-slate-800 p-8 rounded-xl..."&gt;
+        &lt;div class="group relative"&gt;
+          &lt;label class="block text-xs uppercase text-slate-400"&gt;Email&lt;/label&gt;
+          &lt;input type="email" name="user_email" class="w-full bg-slate-900..."/&gt;
+        &lt;/div&gt;
+        &lt;button type="submit" class="w-full py-3 bg-amber-500 font-semibold..."&gt;
+          Submit Order
+        &lt;/button&gt;
+      &lt;/form&gt;
+    &lt;/div&gt;
+  &lt;/div&gt;
+&lt;/div&gt;</code></pre>
+            </div>
+            <div class="mt-4 pt-3 border-t border-[#27272a] text-xs text-red-400/90 font-mono">
+              Consumes 90% of model context window with layout noise and leads to brittle selector guesses.
+            </div>
+          </div>
+
+          <!-- ARIA Snapshot -->
+          <div class="rounded-lg border border-amber-500/30 bg-[#09090b] p-5 flex flex-col justify-between">
+            <div>
+              <div class="flex items-center justify-between pb-3 border-b border-[#27272a]">
+                <div class="flex items-center gap-2">
+                  <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
+                  <span class="font-mono text-xs text-zinc-100 font-semibold">AI Web Tester ARIA Snapshot</span>
+                </div>
+                <span class="font-mono text-[11px] px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                  ~140 TOKENS (99.5% CUT)
+                </span>
+              </div>
+              <pre class="mt-4 font-mono text-xs text-zinc-300 overflow-x-auto leading-relaxed"><code>🌐 Current Page: "Order Checkout"
+🔗 URL: http://localhost:3000/checkout
+📐 Viewport: 1280x720 | Render: 120ms
+
+--- 🎯 Interactive Elements (3 found) ---
+[1] textbox "Email" (required, placeholder="you@domain.com")
+[2] combobox "Shipping Method" (options=["Standard", "Express"])
+[3] button "Submit Order" (type=submit) [in-viewport]
+
+--- 🚨 Detected Issues / Errors (0 detected) ---
+✅ Status Clean: 0 console errors, 0 failed HTTP requests</code></pre>
+            </div>
+            <div class="mt-4 pt-3 border-t border-[#27272a] text-xs text-emerald-400 font-mono">
+              Agent acts decisively: click(ref=3) or fill(ref=1, "alice@test.com") without DOM hallucination.
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Engineering Architecture & Core Pillars -->
+    <section class="py-16 mx-auto max-w-7xl px-4 sm:px-6">
+      <div class="max-w-2xl">
+        <div class="text-xs font-mono text-amber-400 uppercase tracking-wider font-semibold">Engineering Pillars</div>
+        <h2 class="mt-2 text-2xl sm:text-3xl font-bold text-zinc-100">Designed for autonomous quality assurance</h2>
+        <p class="mt-2 text-sm text-zinc-400 leading-relaxed">
+          Built from the ground up to support comprehensive testing workflows without human manual intervention.
         </p>
-        <div class="mt-4 flex gap-2 text-[12px] font-mono">
-          <span class="px-3 py-1.5 rounded-full bg-emerald-500/15 text-emerald-300 border border-emerald-500/20">STATUS: PASSED (3.42s)</span>
-          <span class="px-3 py-1.5 rounded-full border border-[#1e293b] text-slate-400">5 steps completed</span>
-          <span class="px-3 py-1.5 rounded-full border border-[#1e293b] text-slate-400">0 failures</span>
+      </div>
+
+      <div class="mt-10 grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
+        <!-- Card 1 -->
+        <div class="rounded-lg border border-[#27272a] bg-[#121215] p-5 flex flex-col justify-between">
+          <div>
+            <div class="font-mono text-xs text-amber-400 font-semibold">01 · REFS & SELF-HEALING</div>
+            <h3 class="mt-2 text-base font-semibold text-zinc-100">Resilient Interaction Engine</h3>
+            <p class="mt-2 text-xs leading-relaxed text-zinc-400">
+              When dynamic SPAs re-render or shift DOM nodes, the engine automatically recovers using fallback hierarchies: `data-testid` &gt; `id` &gt; `name` &gt; `aria-label` &gt; text matching across click, fill, select, hover, press, check, and upload.
+            </p>
+          </div>
+          <div class="mt-4 pt-3 border-t border-[#27272a] font-mono text-[11px] text-zinc-400">
+            Feature: self-healing fallback loops
+          </div>
+        </div>
+
+        <!-- Card 2 -->
+        <div class="rounded-lg border border-[#27272a] bg-[#121215] p-5 flex flex-col justify-between">
+          <div>
+            <div class="font-mono text-xs text-amber-400 font-semibold">02 · SMART FORM AUTO-FILLER</div>
+            <h3 class="mt-2 text-base font-semibold text-zinc-100">Fuzzing & Boundary Validator</h3>
+            <p class="mt-2 text-xs leading-relaxed text-zinc-400">
+              Inspects inputs, textareas, selects, and checkboxes in one call. Automatically generates realistic valid data (`mode="valid"`) or boundary stress payloads like 300-char strings, negative values, and XSS/SQLi injection strings (`mode="fuzz"`).
+            </p>
+          </div>
+          <div class="mt-4 pt-3 border-t border-[#27272a] font-mono text-[11px] text-zinc-400">
+            Tool: browser_fill_form
+          </div>
+        </div>
+
+        <!-- Card 3 -->
+        <div class="rounded-lg border border-[#27272a] bg-[#121215] p-5 flex flex-col justify-between">
+          <div>
+            <div class="font-mono text-xs text-amber-400 font-semibold">03 · 360 TELEMETRY WATCHDOG</div>
+            <h3 class="mt-2 text-base font-semibold text-zinc-100">Silent Runtime Observer</h3>
+            <p class="mt-2 text-xs leading-relaxed text-zinc-400">
+              Silently captures unhandled exceptions (`pageerror`), console warnings, CORS/CSP policy rejections, and failed network responses (HTTP 4xx/5xx) with formatted response payload previews.
+            </p>
+          </div>
+          <div class="mt-4 pt-3 border-t border-[#27272a] font-mono text-[11px] text-zinc-400">
+            Buffer: 200 recent telemetry events
+          </div>
+        </div>
+
+        <!-- Card 4 -->
+        <div class="rounded-lg border border-[#27272a] bg-[#121215] p-5 flex flex-col justify-between">
+          <div>
+            <div class="font-mono text-xs text-cyan-400 font-semibold">04 · LOG QUERYING (NEW V0.4)</div>
+            <h3 class="mt-2 text-base font-semibold text-zinc-100">Live Console & Network Inspection</h3>
+            <p class="mt-2 text-xs leading-relaxed text-zinc-400">
+              AI agents can inspect the page's exact console messages and API requests on demand via `browser_console_logs` and `browser_network_logs`, complete with HTTP status codes and latency timing in milliseconds.
+            </p>
+          </div>
+          <div class="mt-4 pt-3 border-t border-[#27272a] font-mono text-[11px] text-zinc-400">
+            Tools: browser_console_logs, browser_network_logs
+          </div>
+        </div>
+
+        <!-- Card 5 -->
+        <div class="rounded-lg border border-[#27272a] bg-[#121215] p-5 flex flex-col justify-between">
+          <div>
+            <div class="font-mono text-xs text-emerald-400 font-semibold">05 · ARTIFACT HYGIENE (NEW V0.4)</div>
+            <h3 class="mt-2 text-base font-semibold text-zinc-100">Automatic Maintenance & Clean</h3>
+            <p class="mt-2 text-xs leading-relaxed text-zinc-400">
+              Error-only screenshots avoid disk bloat. Run `ai-test clean` to purge stale test artifacts, video recordings, and old test reports across the repository in a single stroke.
+            </p>
+          </div>
+          <div class="mt-4 pt-3 border-t border-[#27272a] font-mono text-[11px] text-zinc-400">
+            CLI: ai-test clean
+          </div>
+        </div>
+
+        <!-- Card 6 -->
+        <div class="rounded-lg border border-[#27272a] bg-[#121215] p-5 flex flex-col justify-between">
+          <div>
+            <div class="font-mono text-xs text-emerald-400 font-semibold">06 · QUALITY ASSURANCE SUITE</div>
+            <h3 class="mt-2 text-base font-semibold text-zinc-100">WCAG A11y & Visual Diffing</h3>
+            <p class="mt-2 text-xs leading-relaxed text-zinc-400">
+              Run axe-core WCAG 2.1 AA audits to detect missing alt text and contrast failures. Compare screenshots against baselines pixel-by-pixel with configurable regression thresholds.
+            </p>
+          </div>
+          <div class="mt-4 pt-3 border-t border-[#27272a] font-mono text-[11px] text-zinc-400">
+            Tools: browser_audit_a11y, browser_screenshot
+          </div>
         </div>
       </div>
-      <pre class="rounded-2xl bg-[#020617] border border-[#1e293b] p-5 font-mono text-[11.5px] leading-6 overflow-auto text-slate-200"><code><span class="text-slate-500">---</span>
-<span class="text-cyan-300">test_run_id</span>: "rep-1723651234-a8f2"
-<span class="text-cyan-300">status</span>: "PASSED"
-<span class="text-cyan-300">duration_ms</span>: 3420
-<span class="text-slate-500">---</span>
-<span class="text-amber-300"># Test Report: Authentication Flow</span>
-[PASS] Step 1: CLICK [ref=3] (empty validation)
-[PASS] Step 2: FILL [ref=1] "invalid-email" (format)
-[PASS] Step 3: FILL [ref=1] "' OR '1'='1" (injection)
-[PASS] Step 4: FILL [ref=1] "valid@company.com"
-[PASS] Step 5: FILL [ref=2] "correctpass123"
-<span class="text-emerald-400">No runtime console errors or HTTP network failures detected.</span></code></pre>
-    </div>
-  </section>
+    </section>
 
-  <!-- Footer -->
-  <footer class="mt-8 border-t border-[#1e293b]">
-    <div class="mx-auto max-w-[1160px] px-6 py-8 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 text-[13px] text-slate-400">
-      <span>(c) {new Date().getFullYear()} AI Web Tester. MIT License. Built with Playwright and Starlight.</span>
-      <span class="font-mono text-[11px] tracking-[0.1em] text-slate-500">DARK LAB BENCH: INK / AMBER / CYAN</span>
+    <!-- MCP Directory (All 24 Tools in v0.4.0) -->
+    <section class="border-t border-[#27272a] bg-[#121215] py-14">
+      <div class="mx-auto max-w-7xl px-4 sm:px-6">
+        <div class="flex flex-col md:flex-row md:items-end justify-between gap-4">
+          <div>
+            <div class="text-xs font-mono text-amber-400 uppercase tracking-wider font-semibold">Model Context Protocol</div>
+            <h2 class="mt-1 text-2xl sm:text-3xl font-bold text-zinc-100">Complete Directory of 24 MCP Tools</h2>
+            <p class="text-xs text-zinc-400 mt-1">Exposed through stdio for zero-configuration integration with all major AI coding agents.</p>
+          </div>
+          <a href="/mcp/overview" class="text-xs font-mono text-amber-400 hover:underline flex items-center gap-1">
+            <span>Read full MCP schema specification</span>
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+          </a>
+        </div>
+
+        <div class="mt-8 grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+          {[
+            { name: "browser_open", desc: "Launch target URL in browser. Returns session ID and ARIA tree.", tag: "Session" },
+            { name: "browser_act", desc: "Execute click, fill, select, hover, press, upload, or scroll.", tag: "Action" },
+            { name: "browser_fill_form", desc: "Smart form auto-fill with realistic or security fuzz data.", tag: "Action" },
+            { name: "browser_assert", desc: "Validate element visibility, text equality, value, or presence.", tag: "Testing" },
+            { name: "browser_assert_perf", desc: "Assert Web Vitals performance budgets (FCP, DCL, Load, TTFB).", tag: "Testing" },
+            { name: "browser_inspect", desc: "Refresh element references, scroll info, and recent issue list.", tag: "Inspect" },
+            { name: "browser_screenshot", desc: "Capture page screenshot with visual regression pixel comparison.", tag: "Visual" },
+            { name: "browser_live_screenshot", desc: "Stream live base64 screenshot for real-time dashboard viewing.", tag: "Visual" },
+            { name: "browser_console_logs", desc: "Query recent browser console logs with optional level filter.", tag: "Logs (v0.4)" },
+            { name: "browser_network_logs", desc: "Query recent HTTP requests, status codes, and latency timings.", tag: "Logs (v0.4)" },
+            { name: "browser_switch_tab", desc: "List all open pages or switch the active tab context.", tag: "Session" },
+            { name: "browser_save_auth", desc: "Persist authentication storageState (cookies & localStorage).", tag: "Session" },
+            { name: "browser_mock", desc: "Stub network endpoint routes with custom status and response.", tag: "Network" },
+            { name: "browser_mock_reset", desc: "Clear all mocked network routes or specific URL patterns.", tag: "Network" },
+            { name: "browser_audit_a11y", desc: "Execute axe-core WCAG 2.1 AA accessibility compliance audit.", tag: "Quality" },
+            { name: "browser_crawl", desc: "Autonomous deep crawler discovering links, forms, and 404s.", tag: "Crawler" },
+            { name: "browser_report", desc: "Compile complete test session into standard Markdown report.", tag: "Report" },
+            { name: "browser_report_junit", desc: "Generate XML report formatted for CI/CD test ingestors.", tag: "Report" },
+            { name: "browser_report_html", desc: "Export self-contained visual HTML report with dark styling.", tag: "Report" },
+            { name: "browser_run_scenario", desc: "Replay data-driven YAML test flows with concurrency support.", tag: "Workflow" },
+            { name: "browser_generate_scenario", desc: "Synthesize reusable YAML scenario from active browser state.", tag: "Workflow" },
+            { name: "browser_wait_for", desc: "Wait for element to reach visible, hidden, or attached state.", tag: "Action" },
+            { name: "browser_extract", desc: "Extract text, value, HTML, or href attribute for variable use.", tag: "Action" },
+            { name: "browser_close", desc: "Close browser context, clean up tabs, and release memory.", tag: "Session" },
+          ].map((tool) => (
+            <div class="rounded-md border border-[#27272a] bg-[#09090b] p-3.5 flex flex-col justify-between hover:border-zinc-500 transition-colors">
+              <div>
+                <div class="flex items-center justify-between gap-2">
+                  <span class="font-mono text-xs text-amber-400 font-semibold">{tool.name}</span>
+                  <span class="text-[10px] font-mono px-1.5 py-0.5 rounded bg-[#18181b] border border-[#27272a] text-zinc-400">
+                    {tool.tag}
+                  </span>
+                </div>
+                <p class="mt-2 text-xs text-zinc-400 leading-relaxed">{tool.desc}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </section>
+
+    <!-- CLI Reference & Quickstart Setup -->
+    <section id="quickstart" class="py-16 mx-auto max-w-7xl px-4 sm:px-6">
+      <div class="rounded-xl border border-[#27272a] bg-[#121215] overflow-hidden">
+        <div class="px-6 py-5 border-b border-[#27272a] flex flex-wrap items-center justify-between gap-4 bg-[#18181b]">
+          <div>
+            <h2 class="text-lg font-bold text-zinc-100">Setup Wizard & CLI Command Suite</h2>
+            <p class="text-xs text-zinc-400 mt-0.5">Automated registration for Antigravity, OpenCode, Claude Desktop, Cursor, and Windsurf.</p>
+          </div>
+          <div class="flex items-center gap-2">
+            <span class="text-xs font-mono text-zinc-500">Requires Node &gt;= 20</span>
+          </div>
+        </div>
+
+        <div class="grid lg:grid-cols-2 divide-y lg:divide-y-0 lg:divide-x divide-[#27272a]">
+          <!-- Wizard Commands -->
+          <div class="p-6 space-y-4">
+            <div class="font-mono text-xs text-amber-400 font-semibold uppercase">1-Command Agent Registration</div>
+            <p class="text-xs text-zinc-400 leading-relaxed">
+              Run the universal interactive installer. It automatically detects configured coding agents on your machine, registers the MCP server entry, and copies the Senior QA skills into place.
+            </p>
+
+            <div class="space-y-2 pt-2">
+              <div class="p-3 rounded-md bg-[#09090b] border border-[#27272a] flex items-center justify-between font-mono text-xs text-zinc-200">
+                <span>npx ai-test init</span>
+                <button onclick="navigator.clipboard.writeText('npx ai-test init'); this.innerText = 'Copied!'; setTimeout(() => this.innerText = 'Copy', 1500);" class="px-2 py-1 rounded bg-[#18181b] border border-[#27272a] text-[11px] text-zinc-400 hover:text-white transition-colors">
+                  Copy
+                </button>
+              </div>
+
+              <div class="p-3 rounded-md bg-[#09090b] border border-[#27272a] flex items-center justify-between font-mono text-xs text-zinc-200">
+                <span>npx ai-test init -a antigravity opencode claude cursor windsurf</span>
+                <button onclick="navigator.clipboard.writeText('npx ai-test init -a antigravity opencode claude cursor windsurf'); this.innerText = 'Copied!'; setTimeout(() => this.innerText = 'Copy', 1500);" class="px-2 py-1 rounded bg-[#18181b] border border-[#27272a] text-[11px] text-zinc-400 hover:text-white transition-colors">
+                  Copy
+                </button>
+              </div>
+
+              <div class="p-3 rounded-md bg-[#09090b] border border-[#27272a] flex items-center justify-between font-mono text-xs text-zinc-200">
+                <span>npx ai-test doctor</span>
+                <button onclick="navigator.clipboard.writeText('npx ai-test doctor'); this.innerText = 'Copied!'; setTimeout(() => this.innerText = 'Copy', 1500);" class="px-2 py-1 rounded bg-[#18181b] border border-[#27272a] text-[11px] text-zinc-400 hover:text-white transition-colors">
+                  Copy
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Daily CLI Testing Commands -->
+          <div class="p-6 space-y-4">
+            <div class="font-mono text-xs text-amber-400 font-semibold uppercase">Daily Testing & Maintenance CLI</div>
+            <p class="text-xs text-zinc-400 leading-relaxed">
+              Use the built-in CLI to run headless smoke tests, start an interactive REPL shell, synthesize YAML scenarios, or clean up disk artifacts.
+            </p>
+
+            <pre class="rounded-md bg-[#09090b] border border-[#27272a] p-4 font-mono text-xs text-zinc-300 leading-relaxed overflow-x-auto"><code><span class="text-zinc-500"># Run automated smoke test and generate markdown report</span>
+ai-test test http://localhost:3000
+
+<span class="text-zinc-500"># Launch interactive QA terminal shell</span>
+ai-test repl
+
+<span class="text-zinc-500"># Auto-generate replayable test scenario from web page</span>
+ai-test generate http://localhost:3000 -o ./scenarios/auth.yaml
+
+<span class="text-zinc-500"># Clean stale test screenshots, videos, and old reports</span>
+ai-test clean</code></pre>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Sample Markdown Report Section -->
+    <section class="border-t border-[#27272a] bg-[#121215] py-14">
+      <div class="mx-auto max-w-7xl px-4 sm:px-6">
+        <div class="grid lg:grid-cols-2 gap-10 items-start">
+          <div>
+            <div class="text-xs font-mono text-amber-400 uppercase tracking-wider font-semibold">Standardized Audit Output</div>
+            <h2 class="mt-2 text-2xl font-bold text-zinc-100">Executive Markdown Reports with Clickable Evidence</h2>
+            <p class="mt-2 text-xs text-zinc-400 leading-relaxed">
+              Every completed test run generates a structured Markdown report in `./test-reports/` containing execution duration, step audit logs, reproduction stack traces, and direct links to error screenshots.
+            </p>
+
+            <div class="mt-6 space-y-2 text-xs font-mono text-zinc-300">
+              <div class="flex items-center gap-2">
+                <span class="text-emerald-400">✓</span>
+                <span>Error-only screenshots avoid disk bloat</span>
+              </div>
+              <div class="flex items-center gap-2">
+                <span class="text-emerald-400">✓</span>
+                <span>Cross-platform URL links (Windows, Linux, macOS)</span>
+              </div>
+              <div class="flex items-center gap-2">
+                <span class="text-emerald-400">✓</span>
+                <span>Optional JUnit XML and self-contained HTML exports</span>
+              </div>
+              <div class="flex items-center gap-2">
+                <span class="text-emerald-400">✓</span>
+                <span>Direct GitHub Actions PR summary integration</span>
+              </div>
+            </div>
+
+            <div class="mt-8">
+              <a href="/guides/auth" class="text-xs font-mono text-amber-400 hover:underline flex items-center gap-1.5">
+                <span>View authentication test matrix guide</span>
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+              </a>
+            </div>
+          </div>
+
+          <!-- Report Preview Card -->
+          <div class="rounded-lg border border-[#27272a] bg-[#09090b] p-5 font-mono text-xs text-zinc-300 overflow-x-auto leading-relaxed shadow-xl">
+            <div class="text-zinc-500 pb-2 border-b border-[#27272a]">
+              ---<br/>
+              test_run_id: "rep-1790264821-0a4f"<br/>
+              status: "PASSED"<br/>
+              duration_ms: 3820<br/>
+              target_url: "http://localhost:3000"<br/>
+              ---
+            </div>
+            <div class="pt-3 text-zinc-200">
+              <span class="text-amber-400 font-bold"># Test Report: Authentication &amp; Checkout Flow</span><br/><br/>
+              | Step | Action | Target Ref | Input | Status |<br/>
+              | :---: | :--- | :--- | :--- | :--- |<br/>
+              | #1 | CLICK | [ref=3] "Sign In" | - | ✅ Passed |<br/>
+              | #2 | FILL | [ref=1] "Email" | "admin@test.com" | ✅ Passed |<br/>
+              | #3 | FILL | [ref=2] "Password" | "P@ssw0rd123!" | ✅ Passed |<br/>
+              | #4 | CLICK | [ref=3] "Sign In" | - | ✅ Passed |<br/><br/>
+              <span class="text-emerald-400">✅ Status Clean: Zero console errors, zero HTTP 4xx/5xx failures.</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- Quiet, Technical Footer -->
+  <footer class="border-t border-[#27272a] bg-[#09090b] py-8">
+    <div class="mx-auto max-w-7xl px-4 sm:px-6 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-zinc-400 font-mono">
+      <div>
+        <span>AI Web Tester · Released under MIT License by Siam Al Sobari.</span>
+      </div>
+      <div class="flex items-center gap-5">
+        <a href="/intro" class="hover:text-zinc-200 transition-colors">Documentation</a>
+        <a href="/cli/overview" class="hover:text-zinc-200 transition-colors">CLI</a>
+        <a href="/mcp/overview" class="hover:text-zinc-200 transition-colors">MCP Tools</a>
+        <a href="https://github.com/SiamAlSobari/ai-web-tester" target="_blank" rel="noopener noreferrer" class="hover:text-zinc-200 transition-colors">GitHub</a>
+      </div>
     </div>
   </footer>
+
 </body>
 </html>
-
