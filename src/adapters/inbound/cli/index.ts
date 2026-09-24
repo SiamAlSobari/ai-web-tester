@@ -17,7 +17,7 @@ const program = new Command();
 program
   .name('ai-test')
   .description('Autonomous AI Web Testing Engine & Multi-Agent Integration CLI')
-  .version('0.4.0')
+  .version('0.4.1')
   .option('-v, --verbose', 'Enable debug logging', false)
   .hook('preAction', (thisCommand) => {
     if (thisCommand.opts().verbose) setLogLevel('debug');
