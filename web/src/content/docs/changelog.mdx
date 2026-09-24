@@ -3,6 +3,14 @@ title: Changelog
 description: Releases.
 ---
 
+## 0.4.0 — Telemetry Logs, Artifact Maintenance & Driver Synchronization
+
+- **New MCP Tools**: Added `browser_console_logs` (with level filter) and `browser_network_logs` (with status, latencies, and `failedOnly` filter) for autonomous AI debugging.
+- **New CLI Command**: Added `ai-test clean` to purge old test screenshots, traces, and reports from `./artifacts/` and `./test-reports/`.
+- **Driver Synchronization**: Delegated advanced driver capabilities directly through `SessionManager` and fixed multi-session driver desync in MCP server.
+- **Extended Self-Healing**: Added fallback selector recovery for `press`, `check`, and `uncheck` actions.
+- **Runtime & Cross-Platform Fixes**: Resolved Node.js ESM default export incompatibility with `js-yaml` and standardized `pathToFileURL` format for screenshot links across Windows and POSIX systems.
+
 ## 0.3.2 — NPX Universal Binary & Seamless Uninstaller Suite
 
 - **NPX Universal Binary**: Added `"ai-web-tester"` binary mapping to `package.json` for zero-install `npx ai-web-tester init` and `npx ai-web-tester uninstall` workflows.
